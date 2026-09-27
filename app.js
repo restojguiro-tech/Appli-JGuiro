@@ -9,16 +9,16 @@ const STORAGE_KEY = 'jguiro-restaurant-v1';
 const DONNEES_DEMO = {
   restaurant: { nom: 'Restaurant JGuiro', tva: 10 },
   carte: [
-    { id: 'p1', nom: 'Salade César', categorie: 'Entrées', prix: 9.5, disponible: true },
-    { id: 'p2', nom: 'Soupe du jour', categorie: 'Entrées', prix: 7, disponible: true },
-    { id: 'p3', nom: 'Entrecôte frites', categorie: 'Plats', prix: 22, disponible: true },
-    { id: 'p4', nom: 'Pavé de saumon', categorie: 'Plats', prix: 19.5, disponible: true },
-    { id: 'p5', nom: 'Risotto aux champignons', categorie: 'Plats', prix: 17, disponible: true },
-    { id: 'p6', nom: 'Crème brûlée', categorie: 'Desserts', prix: 7.5, disponible: true },
-    { id: 'p7', nom: 'Fondant au chocolat', categorie: 'Desserts', prix: 8, disponible: true },
-    { id: 'p8', nom: 'Café', categorie: 'Boissons', prix: 2.2, disponible: true },
-    { id: 'p9', nom: 'Verre de vin rouge', categorie: 'Boissons', prix: 5.5, disponible: true },
-    { id: 'p10', nom: 'Eau minérale 50cl', categorie: 'Boissons', prix: 3.5, disponible: true },
+    { id: 'p1', nom: 'Salade César', categorie: 'Entrées', prix: 55, disponible: true },
+    { id: 'p2', nom: 'Soupe du jour', categorie: 'Entrées', prix: 35, disponible: true },
+    { id: 'p3', nom: 'Entrecôte frites', categorie: 'Plats', prix: 150, disponible: true },
+    { id: 'p4', nom: 'Pavé de saumon', categorie: 'Plats', prix: 130, disponible: true },
+    { id: 'p5', nom: 'Risotto aux champignons', categorie: 'Plats', prix: 95, disponible: true },
+    { id: 'p6', nom: 'Crème brûlée', categorie: 'Desserts', prix: 40, disponible: true },
+    { id: 'p7', nom: 'Fondant au chocolat', categorie: 'Desserts', prix: 45, disponible: true },
+    { id: 'p8', nom: 'Café', categorie: 'Boissons', prix: 15, disponible: true },
+    { id: 'p9', nom: 'Verre de vin rouge', categorie: 'Boissons', prix: 60, disponible: true },
+    { id: 'p10', nom: 'Eau minérale 50cl', categorie: 'Boissons', prix: 10, disponible: true },
   ],
   tables: [
     { id: 't1', nom: 'Table 1', places: 2 },
@@ -76,8 +76,8 @@ function esc(v) {
   }[c]));
 }
 
-const fmtEuro = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
-const euro = n => fmtEuro.format(n || 0);
+const fmtDh = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const dh = n => fmtDh.format(n || 0) + ' DH';
 
 function aujourdHui() {
   const d = new Date();
@@ -153,7 +153,7 @@ vues.tableau = () => {
   return `
     <h1>Tableau de bord — ${esc(db.restaurant.nom)}</h1>
     <div class="grid cols-4">
-      <div class="card stat"><div class="label">Chiffre d'affaires du jour</div><div class="value">${euro(ca)}</div></div>
+      <div class="card stat"><div class="label">Chiffre d'affaires du jour</div><div class="value">${dh(ca)}</div></div>
       <div class="card stat"><div class="label">Tickets encaissés</div><div class="value">${payeesJour.length}</div></div>
       <div class="card stat"><div class="label">Tables occupées</div><div class="value">${ouvertes.length} / ${db.tables.length}</div></div>
       <div class="card stat"><div class="label">Couverts réservés aujourd'hui</div><div class="value">${couverts}</div></div>
@@ -202,7 +202,7 @@ vues.commandes = () => {
         return `
           <div class="card table-tile ${c ? 'busy' : ''}" data-action="ouvrir-table" data-id="${t.id}">
             <div class="name">${esc(t.nom)}</div>
-            <div class="info">${c ? `${euro(totalCommande(c))} · depuis ${fmtHeure(c.ouverteLe)}` : `Libre · ${esc(t.places)} places`}</div>
+            <div class="info">${c ? `${dh(totalCommande(c))} · depuis ${fmtHeure(c.ouverteLe)}` : `Libre · ${esc(t.places)} places`}</div>
           </div>`;
       }).join('') || '<div class="empty">Aucune table. Ajoutez-en une.</div>'}
     </div>`;
@@ -235,7 +235,7 @@ function vuePriseCommande(tableId) {
                 ${plats.map(p => `
                   <button class="menu-item" data-action="ajouter-ligne" data-id="${p.id}">
                     <div>${esc(p.nom)}</div>
-                    <div class="price">${euro(p.prix)}</div>
+                    <div class="price">${dh(p.prix)}</div>
                   </button>`).join('')}
               </div>
             </div>`;
@@ -250,9 +250,9 @@ function vuePriseCommande(tableId) {
             <strong>${l.qte}</strong>
             <button class="btn qty-btn" data-action="plus" data-i="${i}">+</button>
             <span class="n">${esc(l.nom)}</span>
-            <span>${euro(l.prix * l.qte)}</span>
+            <span>${dh(l.prix * l.qte)}</span>
           </div>`).join('') : '<div class="empty">Ajoutez des articles depuis la carte.</div>'}
-        <div class="ticket-total"><span>Total</span><span>${euro(c ? totalCommande(c) : 0)}</span></div>
+        <div class="ticket-total"><span>Total</span><span>${dh(c ? totalCommande(c) : 0)}</span></div>
         ${c && lignes.length ? `
           <div class="row">
             <button class="btn" data-action="imprimer">🖨️ Addition</button>
@@ -277,7 +277,7 @@ vues.carte = () => `
         ${db.carte.filter(p => p.categorie === cat).map(p => `
           <tr>
             <td>${esc(p.nom)}</td>
-            <td class="num">${euro(p.prix)}</td>
+            <td class="num">${dh(p.prix)}</td>
             <td><span class="badge ${p.disponible ? 'ok' : 'danger'}">${p.disponible ? 'Disponible' : 'Épuisé'}</span></td>
             <td class="num">
               <button class="btn small" data-action="basculer-plat" data-id="${p.id}">${p.disponible ? 'Marquer épuisé' : 'Remettre'}</button>
@@ -293,7 +293,7 @@ function formPlat(p = {}) {
     <label>Nom<input name="nom" required value="${esc(p.nom)}"></label>
     <div class="row">
       <label>Catégorie<input name="categorie" required list="liste-cat" value="${esc(p.categorie)}"></label>
-      <label>Prix (€)<input name="prix" type="number" step="0.01" min="0" required value="${esc(p.prix)}"></label>
+      <label>Prix (DH)<input name="prix" type="number" step="0.01" min="0" required value="${esc(p.prix)}"></label>
     </div>
     <datalist id="liste-cat">${categories().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <label><input type="checkbox" name="disponible" style="width:auto" ${p.disponible !== false ? 'checked' : ''}> Disponible</label>`;
@@ -444,18 +444,18 @@ vues.ventes = () => {
       </select>
     </div>
     <div class="grid cols-4">
-      <div class="card stat"><div class="label">CA TTC</div><div class="value">${euro(ca)}</div></div>
-      <div class="card stat"><div class="label">CA HT (TVA ${tva} %)</div><div class="value">${euro(ht)}</div></div>
+      <div class="card stat"><div class="label">CA TTC</div><div class="value">${dh(ca)}</div></div>
+      <div class="card stat"><div class="label">CA HT (TVA ${tva} %)</div><div class="value">${dh(ht)}</div></div>
       <div class="card stat"><div class="label">Tickets</div><div class="value">${payees.length}</div></div>
-      <div class="card stat"><div class="label">Ticket moyen</div><div class="value">${euro(payees.length ? ca / payees.length : 0)}</div></div>
+      <div class="card stat"><div class="label">Ticket moyen</div><div class="value">${dh(payees.length ? ca / payees.length : 0)}</div></div>
     </div>
     ${periodeVentes > 1 && periodeVentes <= 30 ? `
       <div class="card" style="margin-top:16px">
         <h2>Chiffre d'affaires par jour</h2>
         <div class="bar-chart">
           ${Object.entries(parJour).map(([j, v]) => `
-            <div class="bar-col" title="${fmtDate(j)} : ${euro(v)}">
-              <div class="bar-value">${v ? Math.round(v) + ' €' : ''}</div>
+            <div class="bar-col" title="${fmtDate(j)} : ${dh(v)}">
+              <div class="bar-value">${v ? Math.round(v) + ' DH' : ''}</div>
               <div class="bar" style="height:${(v / max) * 100}%"></div>
               <div class="bar-label">${j.slice(8)}/${j.slice(5, 7)}</div>
             </div>`).join('')}
@@ -467,21 +467,21 @@ vues.ventes = () => {
         ${top.length ? `
           <table class="list">
             <tr><th>Article</th><th class="num">Qté</th><th class="num">Montant</th></tr>
-            ${top.map(([nom, v]) => `<tr><td>${esc(nom)}</td><td class="num">${v.qte}</td><td class="num">${euro(v.montant)}</td></tr>`).join('')}
+            ${top.map(([nom, v]) => `<tr><td>${esc(nom)}</td><td class="num">${v.qte}</td><td class="num">${dh(v.montant)}</td></tr>`).join('')}
           </table>` : '<div class="empty">Aucune vente sur la période.</div>'}
       </div>
       <div class="card">
         <h2>Par moyen de paiement</h2>
         ${Object.keys(parPaiement).length ? `
           <table class="list">
-            ${Object.entries(parPaiement).map(([m, v]) => `<tr><td>${esc(m)}</td><td class="num">${euro(v)}</td></tr>`).join('')}
+            ${Object.entries(parPaiement).map(([m, v]) => `<tr><td>${esc(m)}</td><td class="num">${dh(v)}</td></tr>`).join('')}
           </table>` : '<div class="empty">—</div>'}
         <h2 style="margin-top:20px">Derniers tickets</h2>
         ${payees.length ? `
           <table class="list">
             ${[...payees].reverse().slice(0, 10).map(c => `
               <tr><td>${fmtDate(jourDe(c.payeeLe))} ${fmtHeure(c.payeeLe)}</td>
-              <td>${esc(c.tableNom)}</td><td class="num">${euro(totalCommande(c))}</td></tr>`).join('')}
+              <td>${esc(c.tableNom)}</td><td class="num">${dh(totalCommande(c))}</td></tr>`).join('')}
           </table>` : '<div class="empty">—</div>'}
       </div>
     </div>`;
@@ -568,7 +568,7 @@ const actions = {
 
   'encaisser': () => {
     const c = commandeOuverte(tableSelectionnee);
-    ouvrirModal(`Encaisser ${euro(totalCommande(c))}`, `
+    ouvrirModal(`Encaisser ${dh(totalCommande(c))}`, `
       <label>Moyen de paiement
         <select name="paiement">
           <option>Carte bancaire</option><option>Espèces</option><option>Ticket restaurant</option><option>Chèque</option>
@@ -668,10 +668,10 @@ function imprimerAddition(c) {
     .c{text-align:center}.l{display:flex;justify-content:space-between}hr{border:none;border-top:1px dashed #000}</style></head><body>
     <h2>${esc(db.restaurant.nom)}</h2>
     <div class="c">${esc(c.tableNom)} — ${new Date().toLocaleString('fr-FR')}</div><hr>
-    ${c.lignes.map(l => `<div class="l"><span>${l.qte} × ${esc(l.nom)}</span><span>${euro(l.qte * l.prix)}</span></div>`).join('')}
-    <hr><div class="l"><span>Total HT</span><span>${euro(ht)}</span></div>
-    <div class="l"><span>TVA ${tva} %</span><span>${euro(total - ht)}</span></div>
-    <div class="l"><strong>TOTAL TTC</strong><strong>${euro(total)}</strong></div>
+    ${c.lignes.map(l => `<div class="l"><span>${l.qte} × ${esc(l.nom)}</span><span>${dh(l.qte * l.prix)}</span></div>`).join('')}
+    <hr><div class="l"><span>Total HT</span><span>${dh(ht)}</span></div>
+    <div class="l"><span>TVA ${tva} %</span><span>${dh(total - ht)}</span></div>
+    <div class="l"><strong>TOTAL TTC</strong><strong>${dh(total)}</strong></div>
     <hr><div class="c">Merci de votre visite !</div>
     <script>window.print()<\/script></body></html>`);
   w.document.close();

@@ -8,7 +8,7 @@ Aucune installation n'est nécessaire : ouvrez `index.html` dans un navigateur (
 | Module | Ce qu'il permet |
 |---|---|
 | **Tableau de bord** | Chiffre d'affaires du jour, tables occupées, réservations du jour, alertes de stock |
-| **Commandes** | Plan de salle, prise de commande par table, impression de l'addition (HT / TVA / TTC), encaissement (CB, espèces, ticket restaurant, chèque) |
+| **Commandes** | Plan de salle, prise de commande par table, impression de l'addition (HT / TVA / TTC, en dirhams), encaissement (CB, espèces, ticket restaurant, chèque) |
 | **Carte** | Ajout, modification et suppression des plats par catégorie, avec un statut « épuisé » |
 | **Réservations** | Nom, téléphone, date, heure, couverts, table et notes (allergies…), avec des filtres |
 | **Stock** | Quantités, unités, seuils d'alerte, boutons +/− rapides |

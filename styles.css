@@ -145,7 +145,8 @@ dialog {
   border: none;
   border-radius: var(--radius);
   padding: 20px;
-  width: min(480px, 92vw);
+  width: min(600px, 94vw);
+  max-height: 92vh;
   box-shadow: 0 10px 40px #0004;
 }
 dialog::backdrop { background: #0006; }
@@ -190,3 +191,8 @@ fieldset.variantes legend { color: var(--muted); font-size: .9rem; padding: 0 4p
 .choix-variantes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 8px; }
 .choix-variantes .btn { display: flex; flex-direction: column; align-items: center; padding: 14px 10px; font-weight: 600; }
 .choix-variantes .btn .muted { font-weight: 400; font-size: .85rem; }
+
+/* Tailles des plats : nom + un prix par tarif */
+.taille-row { display: grid; grid-template-columns: minmax(90px, 1.4fr) repeat(var(--nb, 1), minmax(60px, 1fr)) 34px; gap: 6px; margin-bottom: 6px; }
+.taille-row input { padding: 6px 8px; }
+.taille-entete { margin-bottom: 2px; }

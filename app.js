@@ -14,7 +14,8 @@ const DONNEES_DEMO = {
     { id: 'p2', nom: 'Soupe du jour', categorie: 'Entrées', prix: 35, disponible: true },
     { id: 'p3', nom: 'Entrecôte frites', categorie: 'Plats', prix: 150, disponible: true, prixTarifs: { emporter: 140, livraison: 165 },
       variantes: [{ nom: 'Bleue', supplement: 0 }, { nom: 'Saignante', supplement: 0 }, { nom: 'À point', supplement: 0 }, { nom: 'Bien cuite', supplement: 0 }] },
-    { id: 'p4', nom: 'Pavé de saumon', categorie: 'Plats', prix: 130, disponible: true, prixTarifs: { emporter: 120, livraison: 145 } },
+    { id: 'p4', nom: 'Pavé de saumon', categorie: 'Plats', prix: 70, disponible: true,
+      tailles: [{ nom: 'Petit', prix: 70 }, { nom: 'Moyen', prix: 80 }, { nom: 'Grand', prix: 90 }] },
     { id: 'p5', nom: 'Risotto aux champignons', categorie: 'Plats', prix: 95, disponible: true },
     { id: 'p6', nom: 'Crème brûlée', categorie: 'Desserts', prix: 40, disponible: true },
     { id: 'p7', nom: 'Fondant au chocolat', categorie: 'Desserts', prix: 45, disponible: true },
@@ -113,10 +114,16 @@ const categories = () => [...new Set(db.carte.map(p => p.categorie))];
 const variantesDe = p => p.variantes || [];
 const tarifs = () => db.restaurant.tarifs;
 const nomTarif = id => tarifs().find(t => t.id === id)?.nom || 'Sur place';
-function prixPour(plat, tarifId) {
-  const p = tarifId && tarifId !== 'base' ? plat.prixTarifs?.[tarifId] : null;
-  return p == null || p === '' ? plat.prix : Number(p);
+const taillesDe = p => p.tailles || [];
+// Prix d'un plat (ou d'une de ses tailles) pour un tarif donné ; à défaut, le prix de base.
+function prixPour(plat, tarifId, taille = null) {
+  const src = taille || plat;
+  const p = tarifId && tarifId !== 'base' ? src.prixTarifs?.[tarifId] : null;
+  return p == null || p === '' ? Number(src.prix) : Number(p);
 }
+const prixMin = (plat, tarifId) => taillesDe(plat).length
+  ? Math.min(...taillesDe(plat).map(t => prixPour(plat, tarifId, t)))
+  : prixPour(plat, tarifId);
 const fmtSupplement = v => (v.supplement ? ` (+${dh(v.supplement)})` : '');
 
 /* =========================================================
@@ -132,7 +139,7 @@ function ouvrirModal(titre, corpsHtml, onSubmit, libelleOk = 'Enregistrer') {
   $('#modal-ok').textContent = libelleOk || '';
   $('#modal-ok').hidden = !libelleOk;
   modalSubmit = onSubmit;
-  modal.showModal();
+  if (!modal.open) modal.showModal();
   const premier = $('input, select, textarea', modal);
   if (premier) premier.focus();
 }
@@ -255,7 +262,8 @@ function vuePriseCommande(tableId) {
                 ${plats.map(p => `
                   <button class="menu-item" data-action="ajouter-ligne" data-id="${p.id}">
                     <div>${esc(p.nom)}</div>
-                    <div class="price">${dh(prixPour(p, tarif))}</div>
+                    <div class="price">${taillesDe(p).length ? 'dès ' : ''}${dh(prixMin(p, tarif))}</div>
+                    ${taillesDe(p).length ? `<div class="muted small-note">${taillesDe(p).length} tailles</div>` : ''}
                     ${variantesDe(p).length ? `<div class="muted small-note">${variantesDe(p).length} variantes</div>` : ''}
                   </button>`).join('')}
               </div>
@@ -304,9 +312,10 @@ vues.carte = () => `
         ${db.carte.filter(p => p.categorie === cat).map(p => `
           <tr>
             <td>${esc(p.nom)}
+              ${taillesDe(p).length ? `<div class="muted small-note">Tailles : ${taillesDe(p).map(t => `${esc(t.nom)} ${dh(t.prix)}`).join(' · ')}</div>` : ''}
               ${variantesDe(p).length ? `<div class="muted small-note">${variantesDe(p).map(v => esc(v.nom) + fmtSupplement(v)).join(' · ')}</div>` : ''}</td>
-            <td class="num">${dh(p.prix)}
-              ${tarifs().slice(1).filter(t => prixPour(p, t.id) !== p.prix).map(t => `<div class="muted small-note">${esc(t.nom)} : ${dh(prixPour(p, t.id))}</div>`).join('')}</td>
+            <td class="num">${taillesDe(p).length ? 'dès ' : ''}${dh(prixMin(p, 'base'))}
+              ${taillesDe(p).length ? '' : tarifs().slice(1).filter(t => prixPour(p, t.id) !== p.prix).map(t => `<div class="muted small-note">${esc(t.nom)} : ${dh(prixPour(p, t.id))}</div>`).join('')}</td>
             <td><span class="badge ${p.disponible ? 'ok' : 'danger'}">${p.disponible ? 'Disponible' : 'Épuisé'}</span></td>
             <td class="num">
               <button class="btn small" data-action="basculer-plat" data-id="${p.id}">${p.disponible ? 'Marquer épuisé' : 'Remettre'}</button>
@@ -322,11 +331,11 @@ function formPlat(p = {}) {
     <label>Nom<input name="nom" required value="${esc(p.nom)}"></label>
     <div class="row">
       <label>Catégorie<input name="categorie" required list="liste-cat" value="${esc(p.categorie)}"></label>
-      <label>Prix ${tarifs().length > 1 ? esc(tarifs()[0].nom.toLowerCase()) : ''} (DH)<input name="prix" type="number" step="0.01" min="0" required value="${esc(p.prix)}"></label>
+      <label>Prix ${tarifs().length > 1 ? esc(tarifs()[0].nom.toLowerCase()) : ''} (DH)<input name="prix" type="number" step="0.01" min="0" placeholder="${taillesDe(p).length ? 'Selon la taille' : ''}" value="${taillesDe(p).length ? '' : esc(p.prix)}"></label>
     </div>
     ${tarifs().length > 1 ? `
       <fieldset class="variantes">
-        <legend>Prix selon le tarif (vide = même prix)</legend>
+        <legend>Prix selon le tarif (vide = même prix) — plats sans tailles</legend>
         <div class="row" style="flex-wrap:wrap">
           ${tarifs().slice(1).map(t => `
             <label>${esc(t.nom)} (DH)<input name="tarif_${esc(t.id)}" type="number" step="0.01" min="0" placeholder="Même prix"
@@ -336,7 +345,15 @@ function formPlat(p = {}) {
     <datalist id="liste-cat">${categories().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <label><input type="checkbox" name="disponible" style="width:auto" ${p.disponible !== false ? 'checked' : ''}> Disponible</label>
     <fieldset class="variantes">
-      <legend>Variantes (cuisson, taille, garniture…) — facultatif</legend>
+      <legend>Tailles avec leur prix (Petit, Moyen, Grand…) — facultatif</legend>
+      <div class="taille-row taille-entete muted small-note" style="--nb:${tarifs().length}">
+        <span>Taille</span>${tarifs().map((t, i) => `<span>${esc(t.nom)}${i ? '' : ' *'}</span>`).join('')}<span></span>
+      </div>
+      <div id="tailles">${taillesDe(p).map(ligneTaille).join('')}</div>
+      <button type="button" class="btn small" data-action="ajouter-taille">+ Ajouter une taille</button>
+    </fieldset>
+    <fieldset class="variantes">
+      <legend>Variantes (cuisson, garniture…) — facultatif</legend>
       <div id="variantes">${variantesDe(p).map(ligneVariante).join('')}</div>
       <button type="button" class="btn small" data-action="ajouter-variante">+ Ajouter une variante</button>
     </fieldset>`;
@@ -351,6 +368,28 @@ function ligneVariante(v = {}) {
     </div>`;
 }
 
+function ligneTaille(t = {}) {
+  return `
+    <div class="taille-row" style="--nb:${tarifs().length}">
+      <input class="ta-nom" placeholder="Ex. : Grand" value="${esc(t.nom)}">
+      ${tarifs().map((tf, i) => `<input class="ta-prix" data-tarif="${esc(tf.id)}" type="number" step="0.01" min="0"
+        placeholder="${i ? 'Même' : 'DH'}" title="Prix ${esc(tf.nom)}" value="${esc(i ? (t.prixTarifs?.[tf.id] ?? '') : (t.prix ?? ''))}">`).join('')}
+      <button type="button" class="btn small danger" data-action="retirer-taille" title="Retirer">✕</button>
+    </div>`;
+}
+
+function lireTailles() {
+  return $$('#tailles .taille-row').map(r => {
+    const t = { nom: $('.ta-nom', r).value.trim(), prix: null, prixTarifs: {} };
+    $$('.ta-prix', r).forEach(inp => {
+      if (inp.value === '') return;
+      if (inp.dataset.tarif === 'base') t.prix = Number(inp.value);
+      else t.prixTarifs[inp.dataset.tarif] = Number(inp.value);
+    });
+    return t;
+  }).filter(t => t.nom);
+}
+
 function lireVariantes() {
   return $$('#variantes .variante-row')
     .map(r => ({ nom: $('.v-nom', r).value.trim(), supplement: Number($('.v-supp', r).value) || 0 }))
@@ -363,26 +402,33 @@ function lirePlat(d) {
     const v = d['tarif_' + t.id];
     if (v != null && v !== '') prixTarifs[t.id] = Number(v);
   });
-  return { nom: d.nom.trim(), categorie: d.categorie.trim(), prix: Number(d.prix), disponible: d.disponible,
-    variantes: lireVariantes(), prixTarifs };
+  const tailles = lireTailles();
+  const sansPrix = tailles.find(t => t.prix == null);
+  if (sansPrix) { alert(`Indiquez le prix ${tarifs()[0].nom.toLowerCase()} de la taille « ${sansPrix.nom} ».`); return null; }
+  if (!tailles.length && d.prix === '') { alert('Indiquez le prix du plat (ou ajoutez des tailles).'); return null; }
+  const prix = tailles.length ? Math.min(...tailles.map(t => t.prix)) : Number(d.prix);
+  return { nom: d.nom.trim(), categorie: d.categorie.trim(), prix, disponible: d.disponible,
+    variantes: lireVariantes(), tailles, prixTarifs };
 }
 
-function ajouterLigne(plat, variante) {
+function ajouterLigne(plat, taille, variante) {
   let c = commandeOuverte(tableSelectionnee);
   if (!c) {
     c = { id: uid(), tableId: tableSelectionnee, tableNom: db.tables.find(t => t.id === tableSelectionnee).nom,
       lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString(), tarif: tarifEnAttente };
     db.commandes.push(c);
   }
+  const nomTaille = taille ? taille.nom : null;
   const nomVariante = variante ? variante.nom : null;
-  const ligne = c.lignes.find(l => l.platId === plat.id && (l.variante || null) === nomVariante);
+  const ligne = c.lignes.find(l => l.platId === plat.id && (l.taille || null) === nomTaille && (l.variante || null) === nomVariante);
   if (ligne) ligne.qte++;
   else c.lignes.push({
     platId: plat.id,
+    taille: nomTaille,
     variante: nomVariante,
-    nom: variante ? `${plat.nom} (${variante.nom})` : plat.nom,
+    nom: plat.nom + (taille ? ` — ${taille.nom}` : '') + (variante ? ` (${variante.nom})` : ''),
     supplement: variante ? variante.supplement : 0,
-    prix: prixPour(plat, c.tarif) + (variante ? variante.supplement : 0),
+    prix: prixPour(plat, c.tarif, taille) + (variante ? variante.supplement : 0),
     qte: 1,
   });
   sauver(); rendre();
@@ -394,8 +440,40 @@ function changerTarif(c, tarifId) {
     const plat = db.carte.find(p => p.id === l.platId);
     if (!plat) return;
     const supp = l.supplement ?? (variantesDe(plat).find(v => v.nom === l.variante)?.supplement || 0);
-    l.prix = prixPour(plat, tarifId) + supp;
+    const taille = l.taille ? taillesDe(plat).find(t => t.nom === l.taille) : null;
+    l.prix = prixPour(plat, tarifId, taille) + supp;
   });
+}
+
+// Demande la taille puis la variante si le plat en a, avant d'ajouter la ligne.
+function choisirOptions(plat, iTaille = null) {
+  const tailles = taillesDe(plat);
+  const variantes = variantesDe(plat);
+  const c = commandeOuverte(tableSelectionnee);
+  const tarif = c ? (c.tarif || 'base') : tarifEnAttente;
+  if (tailles.length && iTaille == null) {
+    return ouvrirModal(plat.nom, `
+      <p class="muted">Choisissez la taille :</p>
+      <div class="choix-variantes">
+        ${tailles.map((t, i) => `
+          <button type="button" class="btn" data-action="choisir-taille" data-id="${plat.id}" data-t="${i}">
+            ${esc(t.nom)}<span class="muted">${dh(prixPour(plat, tarif, t))}</span>
+          </button>`).join('')}
+      </div>`, null, null);
+  }
+  const taille = iTaille == null ? null : tailles[iTaille];
+  if (variantes.length) {
+    return ouvrirModal(plat.nom + (taille ? ` — ${taille.nom}` : ''), `
+      <p class="muted">Choisissez la variante :</p>
+      <div class="choix-variantes">
+        ${variantes.map((v, i) => `
+          <button type="button" class="btn" data-action="choisir-variante" data-id="${plat.id}" data-t="${iTaille ?? ''}" data-i="${i}">
+            ${esc(v.nom)}<span class="muted">${v.supplement ? '+' + dh(v.supplement) : ''}</span>
+          </button>`).join('')}
+      </div>`, null, null);
+  }
+  if (modal.open) modal.close();
+  ajouterLigne(plat, taille, null);
 }
 
 /* ---------- Réservations ---------- */
@@ -660,24 +738,15 @@ const actions = {
     sauver(); rendre();
   },
 
-  'ajouter-ligne': el => {
-    const plat = db.carte.find(p => p.id === el.dataset.id);
-    const variantes = variantesDe(plat);
-    if (!variantes.length) return ajouterLigne(plat);
-    ouvrirModal(plat.nom, `
-      <p class="muted">Choisissez la variante :</p>
-      <div class="choix-variantes">
-        ${variantes.map((v, i) => `
-          <button type="button" class="btn" data-action="choisir-variante" data-id="${plat.id}" data-i="${i}">
-            ${esc(v.nom)}<span class="muted">${v.supplement ? '+' + dh(v.supplement) : ''}</span>
-          </button>`).join('')}
-      </div>`, null, null);
-  },
+  'ajouter-ligne': el => choisirOptions(db.carte.find(p => p.id === el.dataset.id)),
+
+  'choisir-taille': el => choisirOptions(db.carte.find(p => p.id === el.dataset.id), Number(el.dataset.t)),
 
   'choisir-variante': el => {
     const plat = db.carte.find(p => p.id === el.dataset.id);
+    const taille = el.dataset.t === '' ? null : taillesDe(plat)[el.dataset.t];
     modal.close();
-    ajouterLigne(plat, variantesDe(plat)[el.dataset.i]);
+    ajouterLigne(plat, taille, variantesDe(plat)[el.dataset.i]);
   },
 
   'plus': el => { commandeOuverte(tableSelectionnee).lignes[el.dataset.i].qte++; sauver(); rendre(); },
@@ -717,14 +786,23 @@ const actions = {
 
   /* Carte */
   'ajouter-plat': () => ouvrirModal('Nouveau plat', formPlat(), d => {
-    db.carte.push({ id: uid(), ...lirePlat(d) });
+    const plat = lirePlat(d);
+    if (!plat) return false;
+    db.carte.push({ id: uid(), ...plat });
   }),
   'modifier-plat': el => {
     const p = db.carte.find(x => x.id === el.dataset.id);
     ouvrirModal('Modifier le plat', formPlat(p), d => {
-      Object.assign(p, lirePlat(d));
+      const plat = lirePlat(d);
+      if (!plat) return false;
+      Object.assign(p, plat);
     });
   },
+  'ajouter-taille': () => {
+    $('#tailles').insertAdjacentHTML('beforeend', ligneTaille());
+    $('#tailles .taille-row:last-child .ta-nom').focus();
+  },
+  'retirer-taille': el => el.closest('.taille-row').remove(),
   'ajouter-variante': () => {
     $('#variantes').insertAdjacentHTML('beforeend', ligneVariante());
     $('#variantes .variante-row:last-child .v-nom').focus();

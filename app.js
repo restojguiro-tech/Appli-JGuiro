@@ -35,6 +35,12 @@ const DONNEES_DEMO = {
   ],
   commandes: [],
   reservations: [],
+  fournisseurs: [
+    { id: 'f1', nom: 'Marché aux poissons', tel: '', note: 'Poissons, fruits de mer' },
+    { id: 'f2', nom: 'Boucherie', tel: '', note: 'Viandes' },
+  ],
+  achats: [],
+  operations: [],
   stock: [
     { id: 's1', nom: 'Farine', quantite: 10, unite: 'kg', seuil: 3 },
     { id: 's2', nom: 'Beurre', quantite: 2, unite: 'kg', seuil: 2 },
@@ -495,7 +501,7 @@ vues.stock = () => `
   <div class="card table-wrap">
     ${db.stock.length ? `
       <table class="list">
-        <tr><th>Produit</th><th class="num">Quantité</th><th>Unité</th><th class="num">Seuil d'alerte</th><th>État</th><th></th></tr>
+        <tr><th>Produit</th><th class="num">Quantité</th><th>Unité</th><th class="num">Seuil d'alerte</th><th class="num">Dernier prix d'achat</th><th>État</th><th></th></tr>
         ${[...db.stock].sort((a, b) => a.nom.localeCompare(b.nom)).map(s => {
           const bas = Number(s.quantite) <= Number(s.seuil);
           return `
@@ -508,6 +514,7 @@ vues.stock = () => `
               </td>
               <td>${esc(s.unite)}</td>
               <td class="num">${esc(s.seuil)}</td>
+              <td class="num">${s.prixAchat ? `${dh(s.prixAchat)} / ${esc(s.unite)}` : '<span class="muted">—</span>'}</td>
               <td><span class="badge ${bas ? 'warn' : 'ok'}">${bas ? 'À commander' : 'OK'}</span></td>
               <td class="num">
                 <button class="btn small" data-action="modifier-stock" data-id="${s.id}">Modifier</button>
@@ -515,7 +522,9 @@ vues.stock = () => `
               </td>
             </tr>`;
         }).join('')}
-      </table>` : '<div class="empty">Aucun produit en stock.</div>'}
+      </table>
+      <p class="muted" style="margin-top:12px">Valeur estimée du stock (au dernier prix d'achat) :
+        <strong>${dh(db.stock.reduce((t, s) => t + (Number(s.quantite) * Number(s.prixAchat || 0)), 0))}</strong></p>` : '<div class="empty">Aucun produit en stock.</div>'}
   </div>`;
 
 function formStock(s = {}) {
@@ -851,6 +860,414 @@ document.addEventListener('submit', e => {
   db.restaurant.tva = Number(d.tva);
   sauver(); rendre();
   alert('Paramètres enregistrés.');
+});
+
+/* =========================================================
+   Achats (fournisseurs, factures, entrée en stock)
+   ========================================================= */
+
+const TAUX_TVA = [0, 7, 10, 14, 20];
+const PAIEMENTS = ['Espèces', 'Carte bancaire', 'Virement', 'Chèque'];
+const CATEGORIES_DEPENSES = ['Loyer', 'Salaires', 'Charges sociales (CNSS)', 'Électricité', 'Eau', 'Gaz', 'Internet / Téléphone',
+  'Entretien / Réparations', 'Assurance', 'Impôts et taxes', 'Frais bancaires', 'Publicité', 'Matériel', 'Autre'];
+const CATEGORIES_RECETTES = ['Apport', 'Traiteur / Événement', 'Remboursement', 'Autre'];
+
+const totalAchat = a => a.lignes.reduce((s, l) => s + Number(l.quantite) * Number(l.pu), 0);
+const ht = (ttc, taux) => ttc / (1 + (Number(taux) || 0) / 100);
+const nomFournisseur = id => db.fournisseurs.find(f => f.id === id)?.nom || '—';
+const optionsHtml = (liste, choisi) => liste.map(v => `<option value="${esc(v)}" ${String(v) === String(choisi) ? 'selected' : ''}>${esc(v)}</option>`).join('');
+
+let ongletAchats = 'achats';
+let moisAchats = aujourdHui().slice(0, 7);
+
+vues.achats = () => {
+  const onglets = `
+    <div class="onglets">
+      <button class="btn ${ongletAchats === 'achats' ? 'primary' : ''}" data-action="onglet-achats" data-o="achats">Factures d'achat</button>
+      <button class="btn ${ongletAchats === 'fournisseurs' ? 'primary' : ''}" data-action="onglet-achats" data-o="fournisseurs">Fournisseurs</button>
+    </div>`;
+
+  if (ongletAchats === 'fournisseurs') {
+    return `
+      <div class="toolbar"><h1>Achats</h1>
+        <button class="btn primary" data-action="ajouter-fournisseur">+ Nouveau fournisseur</button></div>
+      ${onglets}
+      <div class="card table-wrap">
+        ${db.fournisseurs.length ? `
+          <table class="list">
+            <tr><th>Fournisseur</th><th>Téléphone</th><th>Produits</th><th class="num">Total acheté</th><th class="num">Reste à payer</th><th></th></tr>
+            ${[...db.fournisseurs].sort((a, b) => a.nom.localeCompare(b.nom)).map(f => {
+              const achats = db.achats.filter(a => a.fournisseurId === f.id);
+              const du = achats.filter(a => !a.paye).reduce((s, a) => s + totalAchat(a), 0);
+              return `
+                <tr>
+                  <td>${esc(f.nom)}</td><td>${esc(f.tel)}</td><td class="muted">${esc(f.note)}</td>
+                  <td class="num">${dh(achats.reduce((s, a) => s + totalAchat(a), 0))}</td>
+                  <td class="num">${du ? `<span class="badge warn">${dh(du)}</span>` : '—'}</td>
+                  <td class="num">
+                    <button class="btn small" data-action="modifier-fournisseur" data-id="${f.id}">Modifier</button>
+                    <button class="btn small danger" data-action="supprimer-fournisseur" data-id="${f.id}">Supprimer</button>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </table>` : '<div class="empty">Aucun fournisseur.</div>'}
+      </div>`;
+  }
+
+  const liste = db.achats.filter(a => a.date.startsWith(moisAchats)).sort((a, b) => b.date.localeCompare(a.date));
+  const total = liste.reduce((s, a) => s + totalAchat(a), 0);
+  const aPayer = db.achats.filter(a => !a.paye);
+  return `
+    <div class="toolbar"><h1>Achats</h1>
+      <div class="row" style="flex:0 0 auto">
+        <input type="month" data-action="mois-achats" value="${moisAchats}" style="width:auto">
+        <button class="btn primary" data-action="ajouter-achat">+ Nouvel achat</button>
+      </div>
+    </div>
+    ${onglets}
+    <div class="grid cols-4">
+      <div class="card stat"><div class="label">Achats du mois (TTC)</div><div class="value">${dh(total)}</div></div>
+      <div class="card stat"><div class="label">Factures du mois</div><div class="value">${liste.length}</div></div>
+      <div class="card stat"><div class="label">Reste à payer (toutes périodes)</div><div class="value">${dh(aPayer.reduce((s, a) => s + totalAchat(a), 0))}</div></div>
+    </div>
+    <div class="card table-wrap" style="margin-top:16px">
+      ${liste.length ? `
+        <table class="list">
+          <tr><th>Date</th><th>Fournisseur</th><th>N° facture</th><th>Produits</th><th class="num">Total TTC</th><th>Paiement</th><th></th></tr>
+          ${liste.map(a => `
+            <tr>
+              <td>${fmtDate(a.date)}</td>
+              <td>${esc(nomFournisseur(a.fournisseurId))}</td>
+              <td>${esc(a.reference)}</td>
+              <td class="muted small-note">${a.lignes.map(l => `${esc(l.quantite)} ${esc(l.unite)} ${esc(l.produit)}`).join(', ')}</td>
+              <td class="num">${dh(totalAchat(a))}</td>
+              <td>${a.paye ? `<span class="badge ok">Payé${a.paiement ? ' · ' + esc(a.paiement) : ''}</span>`
+                : `<button class="btn small" data-action="payer-achat" data-id="${a.id}">À payer → Marquer payé</button>`}</td>
+              <td class="num">
+                <button class="btn small" data-action="modifier-achat" data-id="${a.id}">Modifier</button>
+                <button class="btn small danger" data-action="supprimer-achat" data-id="${a.id}">Supprimer</button>
+              </td>
+            </tr>`).join('')}
+        </table>` : '<div class="empty">Aucun achat ce mois-ci.</div>'}
+    </div>`;
+};
+
+function formFournisseur(f = {}) {
+  return `
+    <label>Nom<input name="nom" required value="${esc(f.nom)}"></label>
+    <label>Téléphone<input name="tel" type="tel" value="${esc(f.tel)}"></label>
+    <label>Produits fournis / notes<input name="note" placeholder="Ex. : poissons, légumes…" value="${esc(f.note)}"></label>`;
+}
+
+function formAchat(a = {}) {
+  const lignes = a.lignes?.length ? a.lignes : [{}];
+  return `
+    <div class="row">
+      <label>Date<input name="date" type="date" required value="${esc(a.date || aujourdHui())}"></label>
+      <label>Fournisseur
+        <select name="fournisseurId">
+          <option value="">— Aucun —</option>
+          ${db.fournisseurs.map(f => `<option value="${f.id}" ${a.fournisseurId === f.id ? 'selected' : ''}>${esc(f.nom)}</option>`).join('')}
+        </select>
+      </label>
+      <label>N° facture<input name="reference" value="${esc(a.reference)}"></label>
+    </div>
+    <fieldset class="variantes">
+      <legend>Produits achetés (prix TTC)</legend>
+      <div class="achat-row muted small-note"><span>Produit</span><span>Qté</span><span>Unité</span><span>Prix unit.</span><span></span></div>
+      <div id="lignes-achat">${lignes.map(ligneAchat).join('')}</div>
+      <button type="button" class="btn small" data-action="ajouter-ligne-achat">+ Ajouter un produit</button>
+      <div class="ticket-total" style="font-size:1.1rem"><span>Total TTC</span><span id="total-achat">${dh(a.lignes ? totalAchat(a) : 0)}</span></div>
+    </fieldset>
+    <datalist id="liste-stock">${db.stock.map(s => `<option value="${esc(s.nom)}">`).join('')}</datalist>
+    <label><input type="checkbox" name="versStock" style="width:auto" ${a.versStock !== false ? 'checked' : ''}> Ajouter les quantités au stock</label>
+    <div class="row">
+      <label>TVA<select name="tva">${TAUX_TVA.map(t => `<option value="${t}" ${Number(a.tva ?? 20) === t ? 'selected' : ''}>${t} %</option>`).join('')}</select></label>
+      <label>Statut<select name="paye"><option value="1" ${a.paye !== false ? 'selected' : ''}>Payé</option><option value="0" ${a.paye === false ? 'selected' : ''}>À payer</option></select></label>
+      <label>Moyen de paiement<select name="paiement">${optionsHtml(PAIEMENTS, a.paiement)}</select></label>
+    </div>`;
+}
+
+function ligneAchat(l = {}) {
+  return `
+    <div class="achat-row">
+      <input class="la-produit" list="liste-stock" placeholder="Ex. : Sole" value="${esc(l.produit)}">
+      <input class="la-qte" type="number" step="any" min="0" value="${esc(l.quantite ?? '')}">
+      <input class="la-unite" placeholder="kg" value="${esc(l.unite)}">
+      <input class="la-pu" type="number" step="0.01" min="0" placeholder="DH" value="${esc(l.pu ?? '')}">
+      <button type="button" class="btn small danger" data-action="retirer-ligne-achat" title="Retirer">✕</button>
+    </div>`;
+}
+
+function lireLignesAchat() {
+  return $$('#lignes-achat .achat-row').map(r => ({
+    produit: $('.la-produit', r).value.trim(),
+    quantite: Number($('.la-qte', r).value) || 0,
+    unite: $('.la-unite', r).value.trim(),
+    pu: Number($('.la-pu', r).value) || 0,
+  })).filter(l => l.produit);
+}
+
+// Ajoute (sens = 1) ou retire (sens = -1) les quantités d'un achat dans le stock.
+function appliquerStock(achat, sens) {
+  if (!achat.versStock) return;
+  achat.lignes.forEach(l => {
+    let s = db.stock.find(x => x.id === l.stockId) || db.stock.find(x => x.nom.toLowerCase() === l.produit.toLowerCase());
+    if (!s) {
+      if (sens < 0) return;
+      s = { id: uid(), nom: l.produit, quantite: 0, unite: l.unite || 'unité', seuil: 0 };
+      db.stock.push(s);
+    }
+    l.stockId = s.id;
+    s.quantite = Math.max(0, +(Number(s.quantite) + sens * l.quantite).toFixed(3));
+    if (sens > 0 && l.pu) s.prixAchat = l.pu;
+  });
+}
+
+function enregistrerAchat(achat, d) {
+  const lignes = lireLignesAchat();
+  if (!lignes.length) { alert('Ajoutez au moins un produit.'); return false; }
+  if (achat) appliquerStock(achat, -1);
+  const donnees = { date: d.date, fournisseurId: d.fournisseurId || null, reference: d.reference.trim(), lignes,
+    versStock: d.versStock, tva: Number(d.tva), paye: d.paye === '1', paiement: d.paiement };
+  if (achat) Object.assign(achat, donnees);
+  else { achat = { id: uid(), ...donnees }; db.achats.push(achat); }
+  appliquerStock(achat, 1);
+}
+
+/* =========================================================
+   Comptabilité
+   ========================================================= */
+
+let periodeCompta = { mois: aujourdHui().slice(0, 7), annee: false };
+
+function mouvementsCompta() {
+  const { mois, annee } = periodeCompta;
+  const dans = ymd => ymd.startsWith(annee ? mois.slice(0, 4) : mois);
+  const tvaResto = Number(db.restaurant.tva) || 0;
+  const mvts = [];
+
+  // Ventes regroupées par jour
+  const ventesParJour = {};
+  db.commandes.filter(c => c.statut === 'payee' && dans(jourDe(c.payeeLe))).forEach(c => {
+    const j = jourDe(c.payeeLe);
+    ventesParJour[j] ??= { ttc: 0, n: 0 };
+    ventesParJour[j].ttc += totalCommande(c);
+    ventesParJour[j].n++;
+  });
+  Object.entries(ventesParJour).forEach(([j, v]) => mvts.push({
+    date: j, sens: 'recette', categorie: 'Ventes', libelle: `Ventes du jour (${v.n} ticket${v.n > 1 ? 's' : ''})`,
+    ttc: v.ttc, tva: tvaResto, paiement: '',
+  }));
+
+  db.achats.filter(a => dans(a.date)).forEach(a => mvts.push({
+    date: a.date, sens: 'depense', categorie: 'Achats marchandises',
+    libelle: `Achat ${nomFournisseur(a.fournisseurId) !== '—' ? nomFournisseur(a.fournisseurId) : ''}${a.reference ? ' — n° ' + a.reference : ''}`.trim(),
+    ttc: totalAchat(a), tva: a.tva, paiement: a.paye ? a.paiement : 'À payer',
+  }));
+
+  db.operations.filter(o => dans(o.date)).forEach(o => mvts.push({
+    date: o.date, sens: o.sens, categorie: o.categorie, libelle: o.libelle, ttc: Number(o.montant),
+    tva: o.tva, paiement: o.paiement, operationId: o.id,
+  }));
+
+  return mvts.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+vues.comptabilite = () => {
+  const mvts = mouvementsCompta();
+  const somme = (liste, f = m => m.ttc) => liste.reduce((s, m) => s + f(m), 0);
+  const recettes = mvts.filter(m => m.sens === 'recette');
+  const depenses = mvts.filter(m => m.sens === 'depense');
+  const totalR = somme(recettes), totalD = somme(depenses);
+  const tvaCollectee = somme(recettes, m => m.ttc - ht(m.ttc, m.tva));
+  const tvaDeductible = somme(depenses, m => m.ttc - ht(m.ttc, m.tva));
+  const resultatHT = somme(recettes, m => ht(m.ttc, m.tva)) - somme(depenses, m => ht(m.ttc, m.tva));
+  const parCategorie = liste => Object.entries(liste.reduce((acc, m) => { acc[m.categorie] = (acc[m.categorie] || 0) + m.ttc; return acc; }, {}))
+    .sort((a, b) => b[1] - a[1]);
+  const dettes = db.achats.filter(a => !a.paye).reduce((s, a) => s + totalAchat(a), 0);
+
+  return `
+    <div class="toolbar"><h1>Comptabilité</h1>
+      <div class="row" style="flex:0 0 auto;flex-wrap:wrap">
+        <input type="month" data-action="mois-compta" value="${periodeCompta.mois}" style="width:auto">
+        <select data-action="annee-compta" style="width:auto">
+          <option value="0" ${!periodeCompta.annee ? 'selected' : ''}>Mois</option>
+          <option value="1" ${periodeCompta.annee ? 'selected' : ''}>Année ${periodeCompta.mois.slice(0, 4)}</option>
+        </select>
+        <button class="btn" data-action="ajouter-operation" data-sens="depense">+ Dépense</button>
+        <button class="btn" data-action="ajouter-operation" data-sens="recette">+ Recette</button>
+        <button class="btn" data-action="exporter-compta">⬇️ Export Excel (CSV)</button>
+      </div>
+    </div>
+    <div class="grid cols-4">
+      <div class="card stat"><div class="label">Recettes (TTC)</div><div class="value" style="color:var(--ok)">${dh(totalR)}</div></div>
+      <div class="card stat"><div class="label">Dépenses (TTC)</div><div class="value" style="color:var(--danger)">${dh(totalD)}</div></div>
+      <div class="card stat"><div class="label">Solde (recettes − dépenses)</div><div class="value">${dh(totalR - totalD)}</div></div>
+      <div class="card stat"><div class="label">Résultat hors taxes</div><div class="value">${dh(resultatHT)}</div></div>
+    </div>
+    <div class="grid cols-2" style="margin-top:16px">
+      <div class="card">
+        <h2>TVA de la période (estimation)</h2>
+        <table class="list">
+          <tr><td>TVA collectée sur les recettes</td><td class="num">${dh(tvaCollectee)}</td></tr>
+          <tr><td>TVA déductible sur les dépenses</td><td class="num">− ${dh(tvaDeductible)}</td></tr>
+          <tr><td><strong>${tvaCollectee - tvaDeductible >= 0 ? 'TVA à payer' : 'Crédit de TVA'}</strong></td>
+            <td class="num"><strong>${dh(Math.abs(tvaCollectee - tvaDeductible))}</strong></td></tr>
+        </table>
+        <p class="muted small-note">À faire vérifier par votre comptable. Factures fournisseurs non payées : <strong>${dh(dettes)}</strong>.</p>
+      </div>
+      <div class="card">
+        <h2>Répartition</h2>
+        <table class="list">
+          ${parCategorie(recettes).map(([c, v]) => `<tr><td><span class="badge ok">Recette</span> ${esc(c)}</td><td class="num">${dh(v)}</td></tr>`).join('')}
+          ${parCategorie(depenses).map(([c, v]) => `<tr><td><span class="badge danger">Dépense</span> ${esc(c)}</td><td class="num">${dh(v)}</td></tr>`).join('')}
+        </table>
+        ${mvts.length ? '' : '<div class="empty">Aucun mouvement sur la période.</div>'}
+      </div>
+    </div>
+    <div class="card table-wrap" style="margin-top:16px">
+      <h2>Journal</h2>
+      ${mvts.length ? `
+        <table class="list">
+          <tr><th>Date</th><th>Catégorie</th><th>Libellé</th><th>Paiement</th><th class="num">Recette</th><th class="num">Dépense</th><th></th></tr>
+          ${mvts.map(m => `
+            <tr>
+              <td>${fmtDate(m.date)}</td><td>${esc(m.categorie)}</td><td>${esc(m.libelle)}</td><td class="muted">${esc(m.paiement)}</td>
+              <td class="num" style="color:var(--ok)">${m.sens === 'recette' ? dh(m.ttc) : ''}</td>
+              <td class="num" style="color:var(--danger)">${m.sens === 'depense' ? dh(m.ttc) : ''}</td>
+              <td class="num">${m.operationId ? `
+                <button class="btn small" data-action="modifier-operation" data-id="${m.operationId}">Modifier</button>
+                <button class="btn small danger" data-action="supprimer-operation" data-id="${m.operationId}">✕</button>` : ''}</td>
+            </tr>`).join('')}
+        </table>` : '<div class="empty">Aucun mouvement sur la période.</div>'}
+      <p class="muted small-note">Les ventes viennent des tickets encaissés et les achats de la page Achats. Ajoutez ici les autres dépenses (loyer, salaires, électricité…) et recettes.</p>
+    </div>`;
+};
+
+function formOperation(o) {
+  const cats = o.sens === 'recette' ? CATEGORIES_RECETTES : CATEGORIES_DEPENSES;
+  return `
+    <div class="row">
+      <label>Date<input name="date" type="date" required value="${esc(o.date || aujourdHui())}"></label>
+      <label>Catégorie<input name="categorie" required list="liste-cat-op" value="${esc(o.categorie)}"></label>
+    </div>
+    <datalist id="liste-cat-op">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+    <label>Libellé<input name="libelle" placeholder="Ex. : Loyer de mars" value="${esc(o.libelle)}"></label>
+    <div class="row">
+      <label>Montant TTC (DH)<input name="montant" type="number" step="0.01" min="0" required value="${esc(o.montant ?? '')}"></label>
+      <label>TVA<select name="tva">${TAUX_TVA.map(t => `<option value="${t}" ${Number(o.tva ?? 0) === t ? 'selected' : ''}>${t} %</option>`).join('')}</select></label>
+      <label>Paiement<select name="paiement">${optionsHtml(PAIEMENTS, o.paiement)}</select></label>
+    </div>`;
+}
+
+function lireOperation(d, sens) {
+  return { sens, date: d.date, categorie: d.categorie.trim(), libelle: d.libelle.trim() || d.categorie.trim(),
+    montant: Number(d.montant), tva: Number(d.tva), paiement: d.paiement };
+}
+
+function exporterCompta() {
+  const mvts = [...mouvementsCompta()].reverse();
+  const nombre = n => n.toFixed(2).replace('.', ',');
+  const cellule = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lignes = [['Date', 'Type', 'Catégorie', 'Libellé', 'Montant TTC', 'Taux TVA', 'TVA', 'Montant HT', 'Paiement']]
+    .concat(mvts.map(m => [fmtDate(m.date), m.sens === 'recette' ? 'Recette' : 'Dépense', m.categorie, m.libelle,
+      nombre(m.ttc), m.tva + ' %', nombre(m.ttc - ht(m.ttc, m.tva)), nombre(ht(m.ttc, m.tva)), m.paiement]));
+  const csv = '﻿' + lignes.map(l => l.map(cellule).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `comptabilite-${periodeCompta.annee ? periodeCompta.mois.slice(0, 4) : periodeCompta.mois}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+Object.assign(actions, {
+  'onglet-achats': el => { ongletAchats = el.dataset.o; rendre(); },
+
+  'ajouter-fournisseur': () => ouvrirModal('Nouveau fournisseur', formFournisseur(), d => {
+    db.fournisseurs.push({ id: uid(), nom: d.nom.trim(), tel: d.tel.trim(), note: d.note.trim() });
+  }),
+  'modifier-fournisseur': el => {
+    const f = db.fournisseurs.find(x => x.id === el.dataset.id);
+    ouvrirModal('Modifier le fournisseur', formFournisseur(f), d => {
+      Object.assign(f, { nom: d.nom.trim(), tel: d.tel.trim(), note: d.note.trim() });
+    });
+  },
+  'supprimer-fournisseur': el => {
+    if (db.achats.some(a => a.fournisseurId === el.dataset.id)) return alert('Ce fournisseur a des achats enregistrés : supprimez-les d\'abord.');
+    if (!confirmer('Supprimer ce fournisseur ?')) return;
+    db.fournisseurs = db.fournisseurs.filter(f => f.id !== el.dataset.id);
+    sauver(); rendre();
+  },
+
+  'ajouter-achat': () => ouvrirModal('Nouvel achat', formAchat(), d => enregistrerAchat(null, d)),
+  'modifier-achat': el => {
+    const a = db.achats.find(x => x.id === el.dataset.id);
+    ouvrirModal('Modifier l\'achat', formAchat(a), d => enregistrerAchat(a, d));
+  },
+  'supprimer-achat': el => {
+    const a = db.achats.find(x => x.id === el.dataset.id);
+    if (!confirmer(a.versStock ? 'Supprimer cet achat ? Les quantités seront retirées du stock.' : 'Supprimer cet achat ?')) return;
+    appliquerStock(a, -1);
+    db.achats = db.achats.filter(x => x !== a);
+    sauver(); rendre();
+  },
+  'payer-achat': el => {
+    const a = db.achats.find(x => x.id === el.dataset.id);
+    ouvrirModal(`Payer ${dh(totalAchat(a))}`, `
+      <label>Moyen de paiement<select name="paiement">${optionsHtml(PAIEMENTS, a.paiement)}</select></label>`,
+    d => { a.paye = true; a.paiement = d.paiement; }, 'Marquer comme payé');
+  },
+  'ajouter-ligne-achat': () => {
+    $('#lignes-achat').insertAdjacentHTML('beforeend', ligneAchat());
+    $('#lignes-achat .achat-row:last-child .la-produit').focus();
+  },
+  'retirer-ligne-achat': el => { el.closest('.achat-row').remove(); majTotalAchat(); },
+
+  'ajouter-operation': el => {
+    const sens = el.dataset.sens;
+    ouvrirModal(sens === 'recette' ? 'Nouvelle recette' : 'Nouvelle dépense', formOperation({ sens }), d => {
+      db.operations.push({ id: uid(), ...lireOperation(d, sens) });
+    });
+  },
+  'modifier-operation': el => {
+    const o = db.operations.find(x => x.id === el.dataset.id);
+    ouvrirModal(o.sens === 'recette' ? 'Modifier la recette' : 'Modifier la dépense', formOperation(o), d => {
+      Object.assign(o, lireOperation(d, o.sens));
+    });
+  },
+  'supprimer-operation': el => {
+    if (!confirmer('Supprimer cette opération ?')) return;
+    db.operations = db.operations.filter(o => o.id !== el.dataset.id);
+    sauver(); rendre();
+  },
+  'exporter-compta': exporterCompta,
+});
+
+function majTotalAchat() {
+  const el = $('#total-achat');
+  if (el) el.textContent = dh(lireLignesAchat().reduce((s, l) => s + l.quantite * l.pu, 0));
+}
+
+document.addEventListener('input', e => {
+  const r = e.target.closest('.achat-row');
+  if (!r) return;
+  // Unité reprise du stock quand on choisit un produit connu
+  if (e.target.classList.contains('la-produit')) {
+    const s = db.stock.find(x => x.nom.toLowerCase() === e.target.value.trim().toLowerCase());
+    if (s && !$('.la-unite', r).value) $('.la-unite', r).value = s.unite;
+    if (s && s.prixAchat && !$('.la-pu', r).value) $('.la-pu', r).value = s.prixAchat;
+  }
+  majTotalAchat();
+});
+
+document.addEventListener('change', e => {
+  const el = e.target;
+  switch (el.dataset.action) {
+    case 'mois-achats': if (el.value) { moisAchats = el.value; rendre(); } break;
+    case 'mois-compta': if (el.value) { periodeCompta.mois = el.value; rendre(); } break;
+    case 'annee-compta': periodeCompta.annee = el.value === '1'; rendre(); break;
+  }
 });
 
 /* =========================================================

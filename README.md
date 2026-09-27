@@ -8,12 +8,12 @@ Aucune installation n'est nécessaire : ouvrez `index.html` dans un navigateur (
 | Module | Ce qu'il permet |
 |---|---|
 | **Tableau de bord** | Chiffre d'affaires du jour, tables occupées, réservations du jour, alertes de stock |
-| **Commandes** | Plan de salle, prise de commande par table, choix du tarif (sur place, à emporter, livraison…), impression de l'addition (HT / TVA / TTC, en dirhams), encaissement (CB, espèces, ticket restaurant, chèque) |
-| **Carte** | Ajout, modification et suppression des plats par catégorie, avec un statut « épuisé » des tailles avec leur propre prix (ex. : Petit 70 DH, Moyen 80 DH, Grand 90 DH), des variantes (cuisson, garniture…) avec supplément facultatif, et un prix différent par tarif |
+| **Commandes** | Plan de salle, prise de commande par table, impression de l'addition (HT / TVA / TTC, en dirhams), encaissement (CB, espèces, ticket restaurant, chèque) |
+| **Carte** | Ajout, modification et suppression des plats par catégorie, avec un statut « épuisé », plusieurs prix possibles par plat (ex. : Sole 100, 120, 130, 140 DH selon la taille du poisson, avec une précision facultative comme « 500 g ») et des variantes (cuisson, garniture…) avec supplément facultatif |
 | **Réservations** | Nom, téléphone, date, heure, couverts, table et notes (allergies…), avec des filtres |
 | **Stock** | Quantités, unités, seuils d'alerte, boutons +/− rapides |
-| **Ventes** | CA TTC/HT, ticket moyen, graphique par jour, meilleures ventes, répartition par moyen de paiement et par tarif |
-| **Paramètres** | Nom du restaurant, taux de TVA, liste des tarifs, export/import de sauvegarde, réinitialisation |
+| **Ventes** | CA TTC/HT, ticket moyen, graphique par jour, meilleures ventes, répartition par moyen de paiement |
+| **Paramètres** | Nom du restaurant, taux de TVA, export/import de sauvegarde, réinitialisation |
 
 ## Données
 

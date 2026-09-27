@@ -7,15 +7,17 @@
 const STORAGE_KEY = 'jguiro-restaurant-v1';
 
 const DONNEES_DEMO = {
-  restaurant: { nom: 'Restaurant JGuiro', tva: 10, tarifs: [{ id: 'base', nom: 'Sur place' }, { id: 'emporter', nom: 'À emporter' }, { id: 'livraison', nom: 'Livraison' }] },
+  restaurant: { nom: 'Restaurant JGuiro', tva: 10 },
   carte: [
     { id: 'p1', nom: 'Salade César', categorie: 'Entrées', prix: 55, disponible: true,
       variantes: [{ nom: 'Nature', supplement: 0 }, { nom: 'Poulet', supplement: 15 }, { nom: 'Crevettes', supplement: 25 }] },
     { id: 'p2', nom: 'Soupe du jour', categorie: 'Entrées', prix: 35, disponible: true },
-    { id: 'p3', nom: 'Entrecôte frites', categorie: 'Plats', prix: 150, disponible: true, prixTarifs: { emporter: 140, livraison: 165 },
+    { id: 'p3', nom: 'Entrecôte frites', categorie: 'Plats', prix: 150, disponible: true,
       variantes: [{ nom: 'Bleue', supplement: 0 }, { nom: 'Saignante', supplement: 0 }, { nom: 'À point', supplement: 0 }, { nom: 'Bien cuite', supplement: 0 }] },
     { id: 'p4', nom: 'Pavé de saumon', categorie: 'Plats', prix: 70, disponible: true,
       tailles: [{ nom: 'Petit', prix: 70 }, { nom: 'Moyen', prix: 80 }, { nom: 'Grand', prix: 90 }] },
+    { id: 'p11', nom: 'Sole', categorie: 'Plats', prix: 100, disponible: true,
+      tailles: [{ nom: '', prix: 100 }, { nom: '', prix: 120 }, { nom: '', prix: 130 }, { nom: '', prix: 140 }] },
     { id: 'p5', nom: 'Risotto aux champignons', categorie: 'Plats', prix: 95, disponible: true },
     { id: 'p6', nom: 'Crème brûlée', categorie: 'Desserts', prix: 40, disponible: true },
     { id: 'p7', nom: 'Fondant au chocolat', categorie: 'Desserts', prix: 45, disponible: true },
@@ -47,7 +49,6 @@ let db = charger();
 function migrer(data) {
   const d = { ...structuredClone(DONNEES_DEMO), ...data };
   d.restaurant = { ...structuredClone(DONNEES_DEMO.restaurant), ...d.restaurant };
-  if (!Array.isArray(d.restaurant.tarifs) || !d.restaurant.tarifs.length) d.restaurant.tarifs = structuredClone(DONNEES_DEMO.restaurant.tarifs);
   return d;
 }
 
@@ -112,18 +113,10 @@ const totalCommande = c => c.lignes.reduce((s, l) => s + l.prix * l.qte, 0);
 const commandeOuverte = tableId => db.commandes.find(c => c.tableId === tableId && c.statut === 'ouverte');
 const categories = () => [...new Set(db.carte.map(p => p.categorie))];
 const variantesDe = p => p.variantes || [];
-const tarifs = () => db.restaurant.tarifs;
-const nomTarif = id => tarifs().find(t => t.id === id)?.nom || 'Sur place';
+// Un plat peut avoir plusieurs prix (ex. : Sole 100, 120, 130 DH), chacun avec une précision facultative (ex. : 500 g).
 const taillesDe = p => p.tailles || [];
-// Prix d'un plat (ou d'une de ses tailles) pour un tarif donné ; à défaut, le prix de base.
-function prixPour(plat, tarifId, taille = null) {
-  const src = taille || plat;
-  const p = tarifId && tarifId !== 'base' ? src.prixTarifs?.[tarifId] : null;
-  return p == null || p === '' ? Number(src.prix) : Number(p);
-}
-const prixMin = (plat, tarifId) => taillesDe(plat).length
-  ? Math.min(...taillesDe(plat).map(t => prixPour(plat, tarifId, t)))
-  : prixPour(plat, tarifId);
+const prixMin = plat => taillesDe(plat).length ? Math.min(...taillesDe(plat).map(t => Number(t.prix))) : Number(plat.prix);
+const libellePrix = t => dh(t.prix) + (t.nom ? ` (${t.nom})` : '');
 const fmtSupplement = v => (v.supplement ? ` (+${dh(v.supplement)})` : '');
 
 /* =========================================================
@@ -209,7 +202,6 @@ vues.tableau = () => {
 
 /* ---------- Commandes (plan de salle) ---------- */
 let tableSelectionnee = null;
-let tarifEnAttente = 'base';
 
 vues.commandes = () => {
   if (tableSelectionnee && db.tables.some(t => t.id === tableSelectionnee)) {
@@ -239,7 +231,6 @@ function vuePriseCommande(tableId) {
   const c = commandeOuverte(tableId);
   const lignes = c ? c.lignes : [];
   const dispo = db.carte.filter(p => p.disponible);
-  const tarif = c ? (c.tarif || 'base') : tarifEnAttente;
 
   return `
     <div class="toolbar">
@@ -262,8 +253,8 @@ function vuePriseCommande(tableId) {
                 ${plats.map(p => `
                   <button class="menu-item" data-action="ajouter-ligne" data-id="${p.id}">
                     <div>${esc(p.nom)}</div>
-                    <div class="price">${taillesDe(p).length ? 'dès ' : ''}${dh(prixMin(p, tarif))}</div>
-                    ${taillesDe(p).length ? `<div class="muted small-note">${taillesDe(p).length} tailles</div>` : ''}
+                    <div class="price">${taillesDe(p).length ? 'dès ' : ''}${dh(prixMin(p))}</div>
+                    ${taillesDe(p).length ? `<div class="muted small-note">${taillesDe(p).length} prix</div>` : ''}
                     ${variantesDe(p).length ? `<div class="muted small-note">${variantesDe(p).length} variantes</div>` : ''}
                   </button>`).join('')}
               </div>
@@ -272,12 +263,6 @@ function vuePriseCommande(tableId) {
       </div>
       <div class="card" id="ticket">
         <h2>Ticket</h2>
-        ${tarifs().length > 1 ? `
-          <label>Tarif
-            <select data-action="tarif-commande">
-              ${tarifs().map(t => `<option value="${esc(t.id)}" ${t.id === tarif ? 'selected' : ''}>${esc(t.nom)}</option>`).join('')}
-            </select>
-          </label>` : ''}
         ${c ? `<p class="muted">Ouvert à ${fmtHeure(c.ouverteLe)}</p>` : ''}
         ${lignes.length ? lignes.map((l, i) => `
           <div class="ticket-line">
@@ -312,10 +297,9 @@ vues.carte = () => `
         ${db.carte.filter(p => p.categorie === cat).map(p => `
           <tr>
             <td>${esc(p.nom)}
-              ${taillesDe(p).length ? `<div class="muted small-note">Tailles : ${taillesDe(p).map(t => `${esc(t.nom)} ${dh(t.prix)}`).join(' · ')}</div>` : ''}
+              ${taillesDe(p).length ? `<div class="muted small-note">Prix : ${taillesDe(p).map(t => esc(libellePrix(t))).join(' · ')}</div>` : ''}
               ${variantesDe(p).length ? `<div class="muted small-note">${variantesDe(p).map(v => esc(v.nom) + fmtSupplement(v)).join(' · ')}</div>` : ''}</td>
-            <td class="num">${taillesDe(p).length ? 'dès ' : ''}${dh(prixMin(p, 'base'))}
-              ${taillesDe(p).length ? '' : tarifs().slice(1).filter(t => prixPour(p, t.id) !== p.prix).map(t => `<div class="muted small-note">${esc(t.nom)} : ${dh(prixPour(p, t.id))}</div>`).join('')}</td>
+            <td class="num">${taillesDe(p).length ? 'dès ' : ''}${dh(prixMin(p))}</td>
             <td><span class="badge ${p.disponible ? 'ok' : 'danger'}">${p.disponible ? 'Disponible' : 'Épuisé'}</span></td>
             <td class="num">
               <button class="btn small" data-action="basculer-plat" data-id="${p.id}">${p.disponible ? 'Marquer épuisé' : 'Remettre'}</button>
@@ -327,31 +311,19 @@ vues.carte = () => `
     </div>`).join('') || '<div class="card empty">La carte est vide.</div>'}`;
 
 function formPlat(p = {}) {
+  const lignesPrix = taillesDe(p).length ? taillesDe(p) : [{ nom: '', prix: p.prix ?? '' }];
   return `
     <label>Nom<input name="nom" required value="${esc(p.nom)}"></label>
     <div class="row">
       <label>Catégorie<input name="categorie" required list="liste-cat" value="${esc(p.categorie)}"></label>
-      <label>Prix ${tarifs().length > 1 ? esc(tarifs()[0].nom.toLowerCase()) : ''} (DH)<input name="prix" type="number" step="0.01" min="0" placeholder="${taillesDe(p).length ? 'Selon la taille' : ''}" value="${taillesDe(p).length ? '' : esc(p.prix)}"></label>
+      <div class="bloc-prix">
+        <span class="bloc-label">Prix (DH)</span>
+        <div id="liste-prix">${lignesPrix.map(lignePrix).join('')}</div>
+        <button type="button" class="btn small" data-action="ajouter-prix">+ Ajouter un prix</button>
+      </div>
     </div>
-    ${tarifs().length > 1 ? `
-      <fieldset class="variantes">
-        <legend>Prix selon le tarif (vide = même prix) — plats sans tailles</legend>
-        <div class="row" style="flex-wrap:wrap">
-          ${tarifs().slice(1).map(t => `
-            <label>${esc(t.nom)} (DH)<input name="tarif_${esc(t.id)}" type="number" step="0.01" min="0" placeholder="Même prix"
-              value="${esc(p.prixTarifs?.[t.id] ?? '')}"></label>`).join('')}
-        </div>
-      </fieldset>` : ''}
     <datalist id="liste-cat">${categories().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <label><input type="checkbox" name="disponible" style="width:auto" ${p.disponible !== false ? 'checked' : ''}> Disponible</label>
-    <fieldset class="variantes">
-      <legend>Tailles avec leur prix (Petit, Moyen, Grand…) — facultatif</legend>
-      <div class="taille-row taille-entete muted small-note" style="--nb:${tarifs().length}">
-        <span>Taille</span>${tarifs().map((t, i) => `<span>${esc(t.nom)}${i ? '' : ' *'}</span>`).join('')}<span></span>
-      </div>
-      <div id="tailles">${taillesDe(p).map(ligneTaille).join('')}</div>
-      <button type="button" class="btn small" data-action="ajouter-taille">+ Ajouter une taille</button>
-    </fieldset>
     <fieldset class="variantes">
       <legend>Variantes (cuisson, garniture…) — facultatif</legend>
       <div id="variantes">${variantesDe(p).map(ligneVariante).join('')}</div>
@@ -362,32 +334,23 @@ function formPlat(p = {}) {
 function ligneVariante(v = {}) {
   return `
     <div class="variante-row">
-      <input class="v-nom" placeholder="Ex. : À point, Grande…" value="${esc(v.nom)}">
+      <input class="v-nom" placeholder="Ex. : À point, Bien cuit…" value="${esc(v.nom)}">
       <input class="v-supp" type="number" step="0.01" min="0" placeholder="+ DH" title="Supplément en DH" value="${v.supplement ? esc(v.supplement) : ''}">
       <button type="button" class="btn small danger" data-action="retirer-variante" title="Retirer">✕</button>
     </div>`;
 }
 
-function ligneTaille(t = {}) {
+function lignePrix(t = {}) {
   return `
-    <div class="taille-row" style="--nb:${tarifs().length}">
-      <input class="ta-nom" placeholder="Ex. : Grand" value="${esc(t.nom)}">
-      ${tarifs().map((tf, i) => `<input class="ta-prix" data-tarif="${esc(tf.id)}" type="number" step="0.01" min="0"
-        placeholder="${i ? 'Même' : 'DH'}" title="Prix ${esc(tf.nom)}" value="${esc(i ? (t.prixTarifs?.[tf.id] ?? '') : (t.prix ?? ''))}">`).join('')}
-      <button type="button" class="btn small danger" data-action="retirer-taille" title="Retirer">✕</button>
+    <div class="prix-row">
+      <input class="px-prix" type="number" step="0.01" min="0" placeholder="DH" value="${esc(t.prix ?? '')}">
+      <input class="px-nom" placeholder="Ex. 500 g" title="Précision facultative (ex. : 500 g, Grand…)" value="${esc(t.nom)}">
+      <button type="button" class="btn small danger" data-action="retirer-prix" title="Retirer ce prix">✕</button>
     </div>`;
 }
 
-function lireTailles() {
-  return $$('#tailles .taille-row').map(r => {
-    const t = { nom: $('.ta-nom', r).value.trim(), prix: null, prixTarifs: {} };
-    $$('.ta-prix', r).forEach(inp => {
-      if (inp.value === '') return;
-      if (inp.dataset.tarif === 'base') t.prix = Number(inp.value);
-      else t.prixTarifs[inp.dataset.tarif] = Number(inp.value);
-    });
-    return t;
-  }).filter(t => t.nom);
+function lirePrix() {
+  return $$('#liste-prix .prix-row').map(r => ({ prix: $('.px-prix', r).value, nom: $('.px-nom', r).value.trim() }));
 }
 
 function lireVariantes() {
@@ -397,73 +360,58 @@ function lireVariantes() {
 }
 
 function lirePlat(d) {
-  const prixTarifs = {};
-  tarifs().slice(1).forEach(t => {
-    const v = d['tarif_' + t.id];
-    if (v != null && v !== '') prixTarifs[t.id] = Number(v);
-  });
-  const tailles = lireTailles();
-  const sansPrix = tailles.find(t => t.prix == null);
-  if (sansPrix) { alert(`Indiquez le prix ${tarifs()[0].nom.toLowerCase()} de la taille « ${sansPrix.nom} ».`); return null; }
-  if (!tailles.length && d.prix === '') { alert('Indiquez le prix du plat (ou ajoutez des tailles).'); return null; }
-  const prix = tailles.length ? Math.min(...tailles.map(t => t.prix)) : Number(d.prix);
-  return { nom: d.nom.trim(), categorie: d.categorie.trim(), prix, disponible: d.disponible,
-    variantes: lireVariantes(), tailles, prixTarifs };
+  const lignes = lirePrix();
+  const sansPrix = lignes.find(l => l.nom && l.prix === '');
+  if (sansPrix) { alert(`Indiquez le prix pour « ${sansPrix.nom} ».`); return null; }
+  const prixListe = lignes.filter(l => l.prix !== '').map(l => ({ nom: l.nom, prix: Number(l.prix) }));
+  if (!prixListe.length) { alert('Indiquez au moins un prix.'); return null; }
+  return { nom: d.nom.trim(), categorie: d.categorie.trim(), prix: Math.min(...prixListe.map(l => l.prix)),
+    disponible: d.disponible, variantes: lireVariantes(), tailles: prixListe.length > 1 ? prixListe : [] };
 }
 
 function ajouterLigne(plat, taille, variante) {
   let c = commandeOuverte(tableSelectionnee);
   if (!c) {
     c = { id: uid(), tableId: tableSelectionnee, tableNom: db.tables.find(t => t.id === tableSelectionnee).nom,
-      lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString(), tarif: tarifEnAttente };
+      lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString() };
     db.commandes.push(c);
   }
-  const nomTaille = taille ? taille.nom : null;
+  const nomTaille = taille?.nom || null;
   const nomVariante = variante ? variante.nom : null;
-  const ligne = c.lignes.find(l => l.platId === plat.id && (l.taille || null) === nomTaille && (l.variante || null) === nomVariante);
+  const prixBase = Number(taille ? taille.prix : plat.prix);
+  const prix = prixBase + (variante ? variante.supplement : 0);
+  const ligne = c.lignes.find(l => l.platId === plat.id && (l.taille || null) === nomTaille
+    && (l.variante || null) === nomVariante && l.prix === prix);
   if (ligne) ligne.qte++;
   else c.lignes.push({
     platId: plat.id,
     taille: nomTaille,
     variante: nomVariante,
-    nom: plat.nom + (taille ? ` — ${taille.nom}` : '') + (variante ? ` (${variante.nom})` : ''),
+    nom: plat.nom + (nomTaille ? ` — ${nomTaille}` : taille ? ` ${dh(taille.prix)}` : '') + (variante ? ` (${variante.nom})` : ''),
     supplement: variante ? variante.supplement : 0,
-    prix: prixPour(plat, c.tarif, taille) + (variante ? variante.supplement : 0),
+    prix,
     qte: 1,
   });
   sauver(); rendre();
 }
 
-function changerTarif(c, tarifId) {
-  c.tarif = tarifId;
-  c.lignes.forEach(l => {
-    const plat = db.carte.find(p => p.id === l.platId);
-    if (!plat) return;
-    const supp = l.supplement ?? (variantesDe(plat).find(v => v.nom === l.variante)?.supplement || 0);
-    const taille = l.taille ? taillesDe(plat).find(t => t.nom === l.taille) : null;
-    l.prix = prixPour(plat, tarifId, taille) + supp;
-  });
-}
-
-// Demande la taille puis la variante si le plat en a, avant d'ajouter la ligne.
+// Demande le prix (si le plat en a plusieurs) puis la variante, avant d'ajouter la ligne.
 function choisirOptions(plat, iTaille = null) {
   const tailles = taillesDe(plat);
   const variantes = variantesDe(plat);
-  const c = commandeOuverte(tableSelectionnee);
-  const tarif = c ? (c.tarif || 'base') : tarifEnAttente;
   if (tailles.length && iTaille == null) {
     return ouvrirModal(plat.nom, `
-      <p class="muted">Choisissez la taille :</p>
+      <p class="muted">Choisissez le prix :</p>
       <div class="choix-variantes">
         ${tailles.map((t, i) => `
           <button type="button" class="btn" data-action="choisir-taille" data-id="${plat.id}" data-t="${i}">
-            ${esc(t.nom)}<span class="muted">${dh(prixPour(plat, tarif, t))}</span>
+            ${dh(t.prix)}<span class="muted">${esc(t.nom)}</span>
           </button>`).join('')}
       </div>`, null, null);
   }
   const taille = iTaille == null ? null : tailles[iTaille];
   if (variantes.length) {
-    return ouvrirModal(plat.nom + (taille ? ` — ${taille.nom}` : ''), `
+    return ouvrirModal(plat.nom + (taille ? ` — ${libellePrix(taille)}` : ''), `
       <p class="muted">Choisissez la variante :</p>
       <div class="choix-variantes">
         ${variantes.map((v, i) => `
@@ -608,8 +556,7 @@ vues.ventes = () => {
 
   const parPaiement = {};
   payees.forEach(c => { parPaiement[c.paiement] = (parPaiement[c.paiement] || 0) + totalCommande(c); });
-  const parTarif = {};
-  payees.forEach(c => { const t = c.tarifNom || nomTarif(c.tarif); parTarif[t] = (parTarif[t] || 0) + totalCommande(c); });
+
 
   const ca = payees.reduce((s, c) => s + totalCommande(c), 0);
   const tva = Number(db.restaurant.tva) || 0;
@@ -655,11 +602,6 @@ vues.ventes = () => {
           <table class="list">
             ${Object.entries(parPaiement).map(([m, v]) => `<tr><td>${esc(m)}</td><td class="num">${dh(v)}</td></tr>`).join('')}
           </table>` : '<div class="empty">—</div>'}
-        <h2 style="margin-top:20px">Par tarif</h2>
-        ${Object.keys(parTarif).length ? `
-          <table class="list">
-            ${Object.entries(parTarif).map(([t, v]) => `<tr><td>${esc(t)}</td><td class="num">${dh(v)}</td></tr>`).join('')}
-          </table>` : '<div class="empty">—</div>'}
         <h2 style="margin-top:20px">Derniers tickets</h2>
         ${payees.length ? `
           <table class="list">
@@ -684,17 +626,6 @@ vues.parametres = () => `
       </form>
     </div>
     <div class="card">
-      <h2>Tarifs</h2>
-      <p class="muted">Le premier tarif utilise le prix de base des plats. Pour les autres, définissez un prix dans chaque plat (Carte → Modifier) ; sinon le prix de base s'applique.</p>
-      <div id="liste-tarifs">
-        ${tarifs().map((t, i) => ligneTarif(t, i === 0)).join('')}
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button type="button" class="btn" data-action="ajouter-tarif">+ Ajouter un tarif</button>
-        <button type="button" class="btn primary" data-action="enregistrer-tarifs">Enregistrer les tarifs</button>
-      </div>
-    </div>
-    <div class="card">
       <h2>Sauvegarde des données</h2>
       <p class="muted">Les données sont enregistrées dans ce navigateur. Exportez-les régulièrement pour ne rien perdre, ou pour les transférer sur un autre appareil.</p>
       <div class="row" style="flex-wrap:wrap">
@@ -707,15 +638,6 @@ vues.parametres = () => `
     </div>
   </div>`;
 
-function ligneTarif(t = {}, base = false) {
-  return `
-    <div class="variante-row tarif-row" data-id="${esc(t.id || '')}">
-      <input class="t-nom" placeholder="Ex. : Livraison" value="${esc(t.nom)}">
-      <span class="muted small-note" style="align-self:center">${base ? 'prix de base' : ''}</span>
-      ${base ? '<span></span>' : '<button type="button" class="btn small danger" data-action="retirer-tarif" title="Retirer">✕</button>'}
-    </div>`;
-}
-
 /* =========================================================
    Actions (délégation d'événements)
    ========================================================= */
@@ -727,7 +649,7 @@ const actions = {
       <label>Nombre de places<input name="places" type="number" min="1" required value="4"></label>`,
     d => { db.tables.push({ id: uid(), nom: d.nom.trim(), places: Number(d.places) }); }),
 
-  'ouvrir-table': el => { tableSelectionnee = el.dataset.id; tarifEnAttente = 'base'; rendre(); },
+  'ouvrir-table': el => { tableSelectionnee = el.dataset.id; rendre(); },
   'retour-salle': () => { tableSelectionnee = null; rendre(); },
 
   'supprimer-table': el => {
@@ -778,7 +700,6 @@ const actions = {
     d => {
       c.statut = 'payee';
       c.paiement = d.paiement;
-      c.tarifNom = nomTarif(c.tarif);
       c.payeeLe = new Date().toISOString();
       tableSelectionnee = null;
     }, 'Valider le paiement');
@@ -798,11 +719,11 @@ const actions = {
       Object.assign(p, plat);
     });
   },
-  'ajouter-taille': () => {
-    $('#tailles').insertAdjacentHTML('beforeend', ligneTaille());
-    $('#tailles .taille-row:last-child .ta-nom').focus();
+  'ajouter-prix': () => {
+    $('#liste-prix').insertAdjacentHTML('beforeend', lignePrix());
+    $('#liste-prix .prix-row:last-child .px-prix').focus();
   },
-  'retirer-taille': el => el.closest('.taille-row').remove(),
+  'retirer-prix': el => el.closest('.prix-row').remove(),
   'ajouter-variante': () => {
     $('#variantes').insertAdjacentHTML('beforeend', ligneVariante());
     $('#variantes .variante-row:last-child .v-nom').focus();
@@ -853,23 +774,6 @@ const actions = {
   },
 
   /* Paramètres */
-  'ajouter-tarif': () => {
-    $('#liste-tarifs').insertAdjacentHTML('beforeend', ligneTarif());
-    $('#liste-tarifs .tarif-row:last-child .t-nom').focus();
-  },
-  'retirer-tarif': el => el.closest('.tarif-row').remove(),
-  'enregistrer-tarifs': () => {
-    const nouveaux = $$('#liste-tarifs .tarif-row')
-      .map(r => ({ id: r.dataset.id || uid(), nom: $('.t-nom', r).value.trim() }))
-      .filter(t => t.nom);
-    if (!nouveaux.length || nouveaux[0].id !== 'base') return alert('Le tarif de base doit avoir un nom.');
-    const ids = new Set(nouveaux.map(t => t.id));
-    const utilise = db.commandes.find(c => c.statut === 'ouverte' && c.tarif && !ids.has(c.tarif));
-    if (utilise) return alert(`Impossible de retirer le tarif « ${nomTarif(utilise.tarif)} » : il est utilisé par la commande en cours de ${utilise.tableNom}.`);
-    db.restaurant.tarifs = nouveaux;
-    sauver(); rendre();
-    alert('Tarifs enregistrés.');
-  },
   'exporter': () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -901,8 +805,7 @@ function imprimerAddition(c) {
     <style>body{font-family:monospace;padding:16px;max-width:320px}h2{text-align:center;margin:0 0 4px}
     .c{text-align:center}.l{display:flex;justify-content:space-between}hr{border:none;border-top:1px dashed #000}</style></head><body>
     <h2>${esc(db.restaurant.nom)}</h2>
-    <div class="c">${esc(c.tableNom)} — ${new Date().toLocaleString('fr-FR')}</div>
-    ${tarifs().length > 1 ? `<div class="c">${esc(nomTarif(c.tarif))}</div>` : ''}<hr>
+    <div class="c">${esc(c.tableNom)} — ${new Date().toLocaleString('fr-FR')}</div><hr>
     ${c.lignes.map(l => `<div class="l"><span>${l.qte} × ${esc(l.nom)}</span><span>${dh(l.qte * l.prix)}</span></div>`).join('')}
     <hr><div class="l"><span>Total HT</span><span>${dh(ht)}</span></div>
     <div class="l"><span>TVA ${tva} %</span><span>${dh(total - ht)}</span></div>
@@ -922,12 +825,6 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   switch (el.dataset.action) {
-    case 'tarif-commande': {
-      const c = commandeOuverte(tableSelectionnee);
-      if (c) { changerTarif(c, el.value); sauver(); } else tarifEnAttente = el.value;
-      rendre();
-      break;
-    }
     case 'filtre-resa': filtreResa = el.value; rendre(); break;
     case 'periode-ventes': periodeVentes = Number(el.value); rendre(); break;
     case 'importer': {

@@ -192,7 +192,8 @@ fieldset.variantes legend { color: var(--muted); font-size: .9rem; padding: 0 4p
 .choix-variantes .btn { display: flex; flex-direction: column; align-items: center; padding: 14px 10px; font-weight: 600; }
 .choix-variantes .btn .muted { font-weight: 400; font-size: .85rem; }
 
-/* Tailles des plats : nom + un prix par tarif */
-.taille-row { display: grid; grid-template-columns: minmax(90px, 1.4fr) repeat(var(--nb, 1), minmax(60px, 1fr)) 34px; gap: 6px; margin-bottom: 6px; }
-.taille-row input { padding: 6px 8px; }
-.taille-entete { margin-bottom: 2px; }
+/* Plusieurs prix par plat (zone « Prix » du formulaire) */
+.bloc-prix { margin-bottom: 12px; }
+.bloc-label { display: block; font-size: .9rem; color: var(--muted); margin-bottom: 4px; }
+.prix-row { display: grid; grid-template-columns: 90px 1fr 34px; gap: 6px; margin-bottom: 6px; }
+.prix-row input { padding: 6px 8px; }

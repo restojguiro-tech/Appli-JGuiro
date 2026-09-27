@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JGuiro — Gestion du restaurant</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🍽️ <span>JGuiro</span></div>
+    <nav id="nav">
+      <a href="#tableau">Tableau de bord</a>
+      <a href="#commandes">Commandes</a>
+      <a href="#carte">Carte</a>
+      <a href="#reservations">Réservations</a>
+      <a href="#stock">Stock</a>
+      <a href="#ventes">Ventes</a>
+      <a href="#parametres">Paramètres</a>
+    </nav>
+  </header>
+
+  <main id="app"></main>
+
+  <dialog id="modal">
+    <form method="dialog" id="modal-form">
+      <h2 id="modal-title"></h2>
+      <div id="modal-body"></div>
+      <div class="actions">
+        <button type="button" class="btn ghost" id="modal-cancel">Annuler</button>
+        <button type="submit" class="btn primary" id="modal-ok">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

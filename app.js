@@ -9,9 +9,11 @@ const STORAGE_KEY = 'jguiro-restaurant-v1';
 const DONNEES_DEMO = {
   restaurant: { nom: 'Restaurant JGuiro', tva: 10 },
   carte: [
-    { id: 'p1', nom: 'Salade César', categorie: 'Entrées', prix: 55, disponible: true },
+    { id: 'p1', nom: 'Salade César', categorie: 'Entrées', prix: 55, disponible: true,
+      variantes: [{ nom: 'Nature', supplement: 0 }, { nom: 'Poulet', supplement: 15 }, { nom: 'Crevettes', supplement: 25 }] },
     { id: 'p2', nom: 'Soupe du jour', categorie: 'Entrées', prix: 35, disponible: true },
-    { id: 'p3', nom: 'Entrecôte frites', categorie: 'Plats', prix: 150, disponible: true },
+    { id: 'p3', nom: 'Entrecôte frites', categorie: 'Plats', prix: 150, disponible: true,
+      variantes: [{ nom: 'Bleue', supplement: 0 }, { nom: 'Saignante', supplement: 0 }, { nom: 'À point', supplement: 0 }, { nom: 'Bien cuite', supplement: 0 }] },
     { id: 'p4', nom: 'Pavé de saumon', categorie: 'Plats', prix: 130, disponible: true },
     { id: 'p5', nom: 'Risotto aux champignons', categorie: 'Plats', prix: 95, disponible: true },
     { id: 'p6', nom: 'Crème brûlée', categorie: 'Desserts', prix: 40, disponible: true },
@@ -101,6 +103,8 @@ function fmtHeure(iso) {
 const totalCommande = c => c.lignes.reduce((s, l) => s + l.prix * l.qte, 0);
 const commandeOuverte = tableId => db.commandes.find(c => c.tableId === tableId && c.statut === 'ouverte');
 const categories = () => [...new Set(db.carte.map(p => p.categorie))];
+const variantesDe = p => p.variantes || [];
+const fmtSupplement = v => (v.supplement ? ` (+${dh(v.supplement)})` : '');
 
 /* =========================================================
    Fenêtre modale générique
@@ -112,7 +116,8 @@ let modalSubmit = null;
 function ouvrirModal(titre, corpsHtml, onSubmit, libelleOk = 'Enregistrer') {
   $('#modal-title').textContent = titre;
   $('#modal-body').innerHTML = corpsHtml;
-  $('#modal-ok').textContent = libelleOk;
+  $('#modal-ok').textContent = libelleOk || '';
+  $('#modal-ok').hidden = !libelleOk;
   modalSubmit = onSubmit;
   modal.showModal();
   const premier = $('input, select, textarea', modal);
@@ -236,6 +241,7 @@ function vuePriseCommande(tableId) {
                   <button class="menu-item" data-action="ajouter-ligne" data-id="${p.id}">
                     <div>${esc(p.nom)}</div>
                     <div class="price">${dh(p.prix)}</div>
+                    ${variantesDe(p).length ? `<div class="muted small-note">${variantesDe(p).length} variantes</div>` : ''}
                   </button>`).join('')}
               </div>
             </div>`;
@@ -276,7 +282,8 @@ vues.carte = () => `
         <tr><th>Nom</th><th class="num">Prix</th><th>Statut</th><th></th></tr>
         ${db.carte.filter(p => p.categorie === cat).map(p => `
           <tr>
-            <td>${esc(p.nom)}</td>
+            <td>${esc(p.nom)}
+              ${variantesDe(p).length ? `<div class="muted small-note">${variantesDe(p).map(v => esc(v.nom) + fmtSupplement(v)).join(' · ')}</div>` : ''}</td>
             <td class="num">${dh(p.prix)}</td>
             <td><span class="badge ${p.disponible ? 'ok' : 'danger'}">${p.disponible ? 'Disponible' : 'Épuisé'}</span></td>
             <td class="num">
@@ -296,7 +303,51 @@ function formPlat(p = {}) {
       <label>Prix (DH)<input name="prix" type="number" step="0.01" min="0" required value="${esc(p.prix)}"></label>
     </div>
     <datalist id="liste-cat">${categories().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
-    <label><input type="checkbox" name="disponible" style="width:auto" ${p.disponible !== false ? 'checked' : ''}> Disponible</label>`;
+    <label><input type="checkbox" name="disponible" style="width:auto" ${p.disponible !== false ? 'checked' : ''}> Disponible</label>
+    <fieldset class="variantes">
+      <legend>Variantes (cuisson, taille, garniture…) — facultatif</legend>
+      <div id="variantes">${variantesDe(p).map(ligneVariante).join('')}</div>
+      <button type="button" class="btn small" data-action="ajouter-variante">+ Ajouter une variante</button>
+    </fieldset>`;
+}
+
+function ligneVariante(v = {}) {
+  return `
+    <div class="variante-row">
+      <input class="v-nom" placeholder="Ex. : À point, Grande…" value="${esc(v.nom)}">
+      <input class="v-supp" type="number" step="0.01" min="0" placeholder="+ DH" title="Supplément en DH" value="${v.supplement ? esc(v.supplement) : ''}">
+      <button type="button" class="btn small danger" data-action="retirer-variante" title="Retirer">✕</button>
+    </div>`;
+}
+
+function lireVariantes() {
+  return $$('#variantes .variante-row')
+    .map(r => ({ nom: $('.v-nom', r).value.trim(), supplement: Number($('.v-supp', r).value) || 0 }))
+    .filter(v => v.nom);
+}
+
+function lirePlat(d) {
+  return { nom: d.nom.trim(), categorie: d.categorie.trim(), prix: Number(d.prix), disponible: d.disponible, variantes: lireVariantes() };
+}
+
+function ajouterLigne(plat, variante) {
+  let c = commandeOuverte(tableSelectionnee);
+  if (!c) {
+    c = { id: uid(), tableId: tableSelectionnee, tableNom: db.tables.find(t => t.id === tableSelectionnee).nom,
+      lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString() };
+    db.commandes.push(c);
+  }
+  const nomVariante = variante ? variante.nom : null;
+  const ligne = c.lignes.find(l => l.platId === plat.id && (l.variante || null) === nomVariante);
+  if (ligne) ligne.qte++;
+  else c.lignes.push({
+    platId: plat.id,
+    variante: nomVariante,
+    nom: variante ? `${plat.nom} (${variante.nom})` : plat.nom,
+    prix: plat.prix + (variante ? variante.supplement : 0),
+    qte: 1,
+  });
+  sauver(); rendre();
 }
 
 /* ---------- Réservations ---------- */
@@ -536,16 +587,22 @@ const actions = {
 
   'ajouter-ligne': el => {
     const plat = db.carte.find(p => p.id === el.dataset.id);
-    let c = commandeOuverte(tableSelectionnee);
-    if (!c) {
-      c = { id: uid(), tableId: tableSelectionnee, tableNom: db.tables.find(t => t.id === tableSelectionnee).nom,
-        lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString() };
-      db.commandes.push(c);
-    }
-    const ligne = c.lignes.find(l => l.platId === plat.id);
-    if (ligne) ligne.qte++;
-    else c.lignes.push({ platId: plat.id, nom: plat.nom, prix: plat.prix, qte: 1 });
-    sauver(); rendre();
+    const variantes = variantesDe(plat);
+    if (!variantes.length) return ajouterLigne(plat);
+    ouvrirModal(plat.nom, `
+      <p class="muted">Choisissez la variante :</p>
+      <div class="choix-variantes">
+        ${variantes.map((v, i) => `
+          <button type="button" class="btn" data-action="choisir-variante" data-id="${plat.id}" data-i="${i}">
+            ${esc(v.nom)}<span class="muted">${v.supplement ? '+' + dh(v.supplement) : ''}</span>
+          </button>`).join('')}
+      </div>`, null, null);
+  },
+
+  'choisir-variante': el => {
+    const plat = db.carte.find(p => p.id === el.dataset.id);
+    modal.close();
+    ajouterLigne(plat, variantesDe(plat)[el.dataset.i]);
   },
 
   'plus': el => { commandeOuverte(tableSelectionnee).lignes[el.dataset.i].qte++; sauver(); rendre(); },
@@ -584,14 +641,20 @@ const actions = {
 
   /* Carte */
   'ajouter-plat': () => ouvrirModal('Nouveau plat', formPlat(), d => {
-    db.carte.push({ id: uid(), nom: d.nom.trim(), categorie: d.categorie.trim(), prix: Number(d.prix), disponible: d.disponible });
+    db.carte.push({ id: uid(), ...lirePlat(d) });
   }),
   'modifier-plat': el => {
     const p = db.carte.find(x => x.id === el.dataset.id);
     ouvrirModal('Modifier le plat', formPlat(p), d => {
-      Object.assign(p, { nom: d.nom.trim(), categorie: d.categorie.trim(), prix: Number(d.prix), disponible: d.disponible });
+      Object.assign(p, lirePlat(d));
     });
   },
+  'ajouter-variante': () => {
+    $('#variantes').insertAdjacentHTML('beforeend', ligneVariante());
+    $('#variantes .variante-row:last-child .v-nom').focus();
+  },
+  'retirer-variante': el => el.closest('.variante-row').remove(),
+
   'basculer-plat': el => {
     const p = db.carte.find(x => x.id === el.dataset.id);
     p.disponible = !p.disponible;

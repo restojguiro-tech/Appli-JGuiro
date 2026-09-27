@@ -9,7 +9,7 @@ Aucune installation n'est nécessaire : ouvrez `index.html` dans un navigateur (
 |---|---|
 | **Tableau de bord** | Chiffre d'affaires du jour, tables occupées, réservations du jour, alertes de stock |
 | **Commandes** | Plan de salle, prise de commande par table, impression de l'addition (HT / TVA / TTC, en dirhams), encaissement (CB, espèces, ticket restaurant, chèque) |
-| **Carte** | Ajout, modification et suppression des plats par catégorie, avec un statut « épuisé » |
+| **Carte** | Ajout, modification et suppression des plats par catégorie, avec un statut « épuisé » et des variantes (cuisson, taille, garniture…) avec supplément de prix facultatif |
 | **Réservations** | Nom, téléphone, date, heure, couverts, table et notes (allergies…), avec des filtres |
 | **Stock** | Quantités, unités, seuils d'alerte, boutons +/− rapides |
 | **Ventes** | CA TTC/HT, ticket moyen, graphique par jour, meilleures ventes, répartition par moyen de paiement |

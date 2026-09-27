@@ -181,3 +181,12 @@ dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top
 @media print {
   .topbar, .no-print { display: none !important; }
 }
+
+/* Variantes des plats */
+.small-note { font-size: .8rem; margin-top: 2px; }
+fieldset.variantes { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0 0 12px; }
+fieldset.variantes legend { color: var(--muted); font-size: .9rem; padding: 0 4px; }
+.variante-row { display: grid; grid-template-columns: 1fr 110px auto; gap: 6px; margin-bottom: 6px; }
+.choix-variantes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.choix-variantes .btn { display: flex; flex-direction: column; align-items: center; padding: 14px 10px; font-weight: 600; }
+.choix-variantes .btn .muted { font-weight: 400; font-size: .85rem; }

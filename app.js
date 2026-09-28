@@ -41,6 +41,7 @@ const DONNEES_DEMO = {
   ],
   achats: [],
   operations: [],
+  factures: [],
   stock: [
     { id: 's1', nom: 'Farine', quantite: 10, unite: 'kg', seuil: 3 },
     { id: 's2', nom: 'Beurre', quantite: 2, unite: 'kg', seuil: 2 },
@@ -616,7 +617,10 @@ vues.ventes = () => {
           <table class="list">
             ${[...payees].reverse().slice(0, 10).map(c => `
               <tr><td>${fmtDate(jourDe(c.payeeLe))} ${fmtHeure(c.payeeLe)}</td>
-              <td>${esc(c.tableNom)}</td><td class="num">${dh(totalCommande(c))}</td></tr>`).join('')}
+              <td>${esc(c.tableNom)}</td><td class="num">${dh(totalCommande(c))}</td>
+              <td class="num">${db.factures.some(f => f.commandeId === c.id)
+                ? `<span class="badge ok">${esc(db.factures.find(f => f.commandeId === c.id).numero)}</span>`
+                : `<button class="btn small" data-action="facturer-ticket" data-id="${c.id}">Facture</button>`}</td></tr>`).join('')}
           </table>` : '<div class="empty">—</div>'}
       </div>
     </div>`;
@@ -631,6 +635,18 @@ vues.parametres = () => `
       <form id="form-params">
         <label>Nom du restaurant<input name="nom" required value="${esc(db.restaurant.nom)}"></label>
         <label>Taux de TVA restauration (%)<input name="tva" type="number" step="0.1" min="0" value="${esc(db.restaurant.tva)}"></label>
+        <label>Adresse<input name="adresse" value="${esc(db.restaurant.adresse)}"></label>
+        <label>Téléphone<input name="telephone" type="tel" value="${esc(db.restaurant.telephone)}"></label>
+        <p class="muted small-note">Mentions légales imprimées sur les factures :</p>
+        <div class="row">
+          <label>ICE<input name="ice" value="${esc(db.restaurant.ice)}"></label>
+          <label>IF (identifiant fiscal)<input name="if" value="${esc(db.restaurant.if)}"></label>
+        </div>
+        <div class="row">
+          <label>RC<input name="rc" value="${esc(db.restaurant.rc)}"></label>
+          <label>Patente<input name="patente" value="${esc(db.restaurant.patente)}"></label>
+          <label>CNSS<input name="cnss" value="${esc(db.restaurant.cnss)}"></label>
+        </div>
         <button class="btn primary" type="submit">Enregistrer</button>
       </form>
     </div>
@@ -858,6 +874,7 @@ document.addEventListener('submit', e => {
   const d = Object.fromEntries(new FormData(e.target));
   db.restaurant.nom = d.nom.trim();
   db.restaurant.tva = Number(d.tva);
+  ['adresse', 'telephone', 'ice', 'if', 'rc', 'patente', 'cnss'].forEach(k => { db.restaurant[k] = d[k].trim(); });
   sauver(); rendre();
   alert('Paramètres enregistrés.');
 });
@@ -1066,6 +1083,11 @@ function mouvementsCompta() {
     ttc: totalAchat(a), tva: a.tva, paiement: a.paye ? a.paiement : 'À payer',
   }));
 
+  db.factures.filter(f => !f.commandeId && dans(f.date)).forEach(f => mvts.push({
+    date: f.date, sens: 'recette', categorie: 'Factures', libelle: `Facture ${f.numero} — ${f.client.nom}`,
+    ttc: totalFacture(f), tva: f.tva, paiement: f.paiement,
+  }));
+
   db.operations.filter(o => dans(o.date)).forEach(o => mvts.push({
     date: o.date, sens: o.sens, categorie: o.categorie, libelle: o.libelle, ttc: Number(o.montant),
     tva: o.tva, paiement: o.paiement, operationId: o.id,
@@ -1269,6 +1291,222 @@ document.addEventListener('change', e => {
     case 'annee-compta': periodeCompta.annee = el.value === '1'; rendre(); break;
   }
 });
+
+/* =========================================================
+   Factures clients
+   ========================================================= */
+
+const totalFacture = f => f.lignes.reduce((s, l) => s + Number(l.qte) * Number(l.pu), 0);
+
+function prochainNumero(date) {
+  const annee = date.slice(0, 4);
+  const n = db.factures.filter(f => f.numero.startsWith(`F-${annee}-`)).length + 1;
+  return `F-${annee}-${String(n).padStart(4, '0')}`;
+}
+
+// Montant en toutes lettres (ex. : 1 250,50 → « mille deux cent cinquante dirhams et cinquante centimes »)
+function enLettres(n) {
+  const unites = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze',
+    'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf'];
+  const dizaines = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante'];
+  const moinsDeCent = x => {
+    if (x < 20) return unites[x];
+    const d = Math.floor(x / 10), u = x % 10;
+    if (d === 7 || d === 9) return (d === 7 ? 'soixante' : 'quatre-vingt') + (x % 20 === 11 && d === 7 ? ' et ' : '-') + unites[10 + u];
+    if (d === 8) return u ? 'quatre-vingt-' + unites[u] : 'quatre-vingts';
+    return dizaines[d] + (u === 1 ? ' et un' : u ? '-' + unites[u] : '');
+  };
+  const moinsDeMille = x => {
+    const c = Math.floor(x / 100), r = x % 100;
+    const cents = c === 0 ? '' : c === 1 ? 'cent' : unites[c] + ' cent' + (r ? '' : 's');
+    return [cents, r ? moinsDeCent(r) : ''].filter(Boolean).join(' ');
+  };
+  const entier = x => {
+    if (x === 0) return 'zéro';
+    const parts = [];
+    const milliards = Math.floor(x / 1e9), millions = Math.floor(x / 1e6) % 1000, milliers = Math.floor(x / 1000) % 1000, reste = x % 1000;
+    if (milliards) parts.push(moinsDeMille(milliards) + (milliards > 1 ? ' milliards' : ' milliard'));
+    if (millions) parts.push(moinsDeMille(millions) + (millions > 1 ? ' millions' : ' million'));
+    if (milliers) parts.push(milliers === 1 ? 'mille' : moinsDeMille(milliers).replace(/cents$/, 'cent') + ' mille');
+    if (reste) parts.push(moinsDeMille(reste));
+    return parts.join(' ');
+  };
+  const cts = Math.round(n * 100);
+  const dhs = Math.floor(cts / 100), c = cts % 100;
+  let txt = entier(dhs) + (dhs > 1 ? ' dirhams' : ' dirham');
+  if (c) txt += ' et ' + entier(c) + (c > 1 ? ' centimes' : ' centime');
+  return txt;
+}
+
+vues.factures = () => {
+  const factures = [...db.factures].sort((a, b) => b.numero.localeCompare(a.numero));
+  const facturees = new Set(db.factures.map(f => f.commandeId).filter(Boolean));
+  const tickets = db.commandes.filter(c => c.statut === 'payee' && !facturees.has(c.id))
+    .sort((a, b) => b.payeeLe.localeCompare(a.payeeLe)).slice(0, 15);
+  const infosManquantes = !db.restaurant.ice;
+
+  return `
+    <div class="toolbar"><h1>Factures clients</h1>
+      <button class="btn primary" data-action="nouvelle-facture">+ Facture libre</button></div>
+    ${infosManquantes ? `<div class="card" style="margin-bottom:16px;background:#fdf3e1">
+      ⚠️ Pensez à renseigner l'adresse, l'ICE, l'IF et le RC du restaurant dans <a href="#parametres">Paramètres</a> : ils apparaissent sur les factures.</div>` : ''}
+    <div class="grid cols-2">
+      <div class="card table-wrap">
+        <h2>Tickets encaissés à facturer</h2>
+        ${tickets.length ? `
+          <table class="list">
+            ${tickets.map(c => `
+              <tr><td>${fmtDate(jourDe(c.payeeLe))} ${fmtHeure(c.payeeLe)}</td><td>${esc(c.tableNom)}</td>
+                <td class="num">${dh(totalCommande(c))}</td>
+                <td class="num"><button class="btn small" data-action="facturer-ticket" data-id="${c.id}">Faire la facture</button></td></tr>`).join('')}
+          </table>` : '<div class="empty">Aucun ticket récent à facturer.</div>'}
+      </div>
+      <div class="card table-wrap">
+        <h2>Factures émises</h2>
+        ${factures.length ? `
+          <table class="list">
+            <tr><th>N°</th><th>Date</th><th>Client</th><th class="num">Total TTC</th><th></th></tr>
+            ${factures.map((f, i) => `
+              <tr><td>${esc(f.numero)}</td><td>${fmtDate(f.date)}</td><td>${esc(f.client.nom)}</td>
+                <td class="num">${dh(totalFacture(f))}</td>
+                <td class="num">
+                  <button class="btn small" data-action="imprimer-facture" data-id="${f.id}">🖨️ Imprimer</button>
+                  <button class="btn small" data-action="modifier-facture" data-id="${f.id}">Modifier</button>
+                  ${i === 0 ? `<button class="btn small danger" data-action="supprimer-facture" data-id="${f.id}" title="Seule la dernière facture peut être supprimée">✕</button>` : ''}
+                </td></tr>`).join('')}
+          </table>` : '<div class="empty">Aucune facture émise.</div>'}
+      </div>
+    </div>`;
+};
+
+function formFacture(f) {
+  return `
+    ${f.numero ? `<p class="muted">Facture n° <strong>${esc(f.numero)}</strong></p>` : ''}
+    <div class="row">
+      <label>Client (nom ou société)<input name="clientNom" required value="${esc(f.client?.nom)}"></label>
+      <label>ICE du client<input name="clientIce" placeholder="Facultatif" value="${esc(f.client?.ice)}"></label>
+    </div>
+    <label>Adresse du client<input name="clientAdresse" placeholder="Facultatif" value="${esc(f.client?.adresse)}"></label>
+    <div class="row">
+      <label>Date<input name="date" type="date" required value="${esc(f.date || aujourdHui())}"></label>
+      <label>Paiement<select name="paiement">${optionsHtml(['Espèces', 'Carte bancaire', 'Virement', 'Chèque', 'Ticket restaurant', 'À régler'], f.paiement)}</select></label>
+    </div>
+    <fieldset class="variantes">
+      <legend>Lignes (prix TTC)</legend>
+      <div class="facture-row muted small-note"><span>Désignation</span><span>Qté</span><span>Prix unit.</span><span></span></div>
+      <div id="lignes-facture">${(f.lignes?.length ? f.lignes : [{}]).map(ligneFacture).join('')}</div>
+      <button type="button" class="btn small" data-action="ajouter-ligne-facture">+ Ajouter une ligne</button>
+      <div class="ticket-total" style="font-size:1.1rem"><span>Total TTC</span><span id="total-facture">${dh(f.lignes ? totalFacture(f) : 0)}</span></div>
+    </fieldset>`;
+}
+
+function ligneFacture(l = {}) {
+  return `
+    <div class="facture-row">
+      <input class="lf-des" value="${esc(l.designation)}" placeholder="Ex. : Menu du jour">
+      <input class="lf-qte" type="number" step="any" min="0" value="${esc(l.qte ?? 1)}">
+      <input class="lf-pu" type="number" step="0.01" min="0" placeholder="DH" value="${esc(l.pu ?? '')}">
+      <button type="button" class="btn small danger" data-action="retirer-ligne-facture" title="Retirer">✕</button>
+    </div>`;
+}
+
+function lireLignesFacture() {
+  return $$('#lignes-facture .facture-row').map(r => ({
+    designation: $('.lf-des', r).value.trim(), qte: Number($('.lf-qte', r).value) || 0, pu: Number($('.lf-pu', r).value) || 0,
+  })).filter(l => l.designation);
+}
+
+function enregistrerFacture(f, d) {
+  const lignes = lireLignesFacture();
+  if (!lignes.length) { alert('Ajoutez au moins une ligne.'); return false; }
+  Object.assign(f, {
+    date: d.date, paiement: d.paiement, lignes,
+    client: { nom: d.clientNom.trim(), ice: d.clientIce.trim(), adresse: d.clientAdresse.trim() },
+  });
+  if (!f.id) {
+    f.id = uid();
+    f.numero = prochainNumero(f.date);
+    f.tva = Number(db.restaurant.tva) || 0;
+    db.factures.push(f);
+  }
+  setTimeout(() => imprimerFacture(f));
+}
+
+function ouvrirFacture(f) {
+  ouvrirModal(f.id ? `Modifier la facture ${f.numero}` : 'Nouvelle facture', formFacture(f),
+    d => enregistrerFacture(f, d), f.id ? 'Enregistrer et imprimer' : 'Créer et imprimer');
+}
+
+function imprimerFacture(f) {
+  const w = window.open('', '_blank', 'width=820,height=1000');
+  if (!w) return alert('Autorisez les fenêtres pop-up pour imprimer la facture.');
+  const r = db.restaurant;
+  const ttc = totalFacture(f);
+  const montantHT = ht(ttc, f.tva);
+  const legal = [r.ice && `ICE : ${r.ice}`, r.if && `IF : ${r.if}`, r.rc && `RC : ${r.rc}`, r.patente && `Patente : ${r.patente}`,
+    r.cnss && `CNSS : ${r.cnss}`].filter(Boolean).join(' — ');
+  w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Facture ${esc(f.numero)}</title>
+    <style>
+      body{font-family:Arial,Helvetica,sans-serif;color:#222;margin:0;padding:40px;font-size:14px}
+      .entete{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px}
+      h1{margin:0 0 6px;font-size:24px} .titre{font-size:26px;font-weight:bold;text-align:right}
+      .client{border:1px solid #ccc;border-radius:6px;padding:12px 16px;width:45%;margin-left:auto;margin-bottom:30px}
+      table{width:100%;border-collapse:collapse;margin-bottom:20px} th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}
+      th{background:#f3f3f3} .n{text-align:right}
+      .totaux{width:45%;margin-left:auto} .totaux td{border:none;padding:4px 8px} .totaux tr:last-child td{font-weight:bold;font-size:16px;border-top:2px solid #222}
+      .lettres{margin:24px 0;font-style:italic} .pied{position:fixed;bottom:30px;left:40px;right:40px;text-align:center;font-size:11px;color:#555;border-top:1px solid #ccc;padding-top:8px}
+      @media print{body{padding:20px 30px}}
+    </style></head><body>
+    <div class="entete">
+      <div><h1>${esc(r.nom)}</h1>${esc(r.adresse || '')}<br>${esc(r.telephone ? 'Tél. : ' + r.telephone : '')}</div>
+      <div class="titre">FACTURE<div style="font-size:14px;font-weight:normal">N° ${esc(f.numero)}<br>Date : ${fmtDate(f.date)}</div></div>
+    </div>
+    <div class="client"><strong>${esc(f.client.nom)}</strong>${f.client.adresse ? '<br>' + esc(f.client.adresse) : ''}${f.client.ice ? '<br>ICE : ' + esc(f.client.ice) : ''}</div>
+    <table>
+      <tr><th>Désignation</th><th class="n">Qté</th><th class="n">Prix unit. TTC</th><th class="n">Total TTC</th></tr>
+      ${f.lignes.map(l => `<tr><td>${esc(l.designation)}</td><td class="n">${esc(l.qte)}</td><td class="n">${dh(l.pu)}</td><td class="n">${dh(l.qte * l.pu)}</td></tr>`).join('')}
+    </table>
+    <table class="totaux">
+      <tr><td>Total HT</td><td class="n">${dh(montantHT)}</td></tr>
+      <tr><td>TVA ${esc(f.tva)} %</td><td class="n">${dh(ttc - montantHT)}</td></tr>
+      <tr><td>Total TTC</td><td class="n">${dh(ttc)}</td></tr>
+    </table>
+    <p class="lettres">Arrêtée la présente facture à la somme de : <strong>${esc(enLettres(ttc))}</strong> TTC.</p>
+    <p>Mode de paiement : ${esc(f.paiement)}</p>
+    <div class="pied">${esc(r.nom)}${r.adresse ? ' — ' + esc(r.adresse) : ''}<br>${esc(legal)}</div>
+    <script>window.onload = () => window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+Object.assign(actions, {
+  'nouvelle-facture': () => ouvrirFacture({}),
+  'facturer-ticket': el => {
+    const c = db.commandes.find(x => x.id === el.dataset.id);
+    ouvrirFacture({
+      commandeId: c.id, date: jourDe(c.payeeLe), paiement: c.paiement,
+      lignes: c.lignes.map(l => ({ designation: l.nom, qte: l.qte, pu: l.prix })),
+    });
+  },
+  'modifier-facture': el => ouvrirFacture(db.factures.find(f => f.id === el.dataset.id)),
+  'imprimer-facture': el => imprimerFacture(db.factures.find(f => f.id === el.dataset.id)),
+  'supprimer-facture': el => {
+    const f = db.factures.find(x => x.id === el.dataset.id);
+    if (!confirmer(`Supprimer la facture ${f.numero} ? Le numéro sera réutilisé pour la prochaine facture.`)) return;
+    db.factures = db.factures.filter(x => x !== f);
+    sauver(); rendre();
+  },
+  'ajouter-ligne-facture': () => {
+    $('#lignes-facture').insertAdjacentHTML('beforeend', ligneFacture());
+    $('#lignes-facture .facture-row:last-child .lf-des').focus();
+  },
+  'retirer-ligne-facture': el => { el.closest('.facture-row').remove(); majTotalFacture(); },
+});
+
+function majTotalFacture() {
+  const el = $('#total-facture');
+  if (el) el.textContent = dh(lireLignesFacture().reduce((s, l) => s + l.qte * l.pu, 0));
+}
+document.addEventListener('input', e => { if (e.target.closest('.facture-row')) majTotalFacture(); });
 
 /* =========================================================
    Routage

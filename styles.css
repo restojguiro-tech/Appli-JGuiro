@@ -203,3 +203,6 @@ fieldset.variantes legend { color: var(--muted); font-size: .9rem; padding: 0 4p
 .achat-row { display: grid; grid-template-columns: 1fr 70px 70px 90px 34px; gap: 6px; margin-bottom: 6px; }
 .achat-row input { padding: 6px 8px; }
 .toolbar .btn { white-space: nowrap; }
+
+.facture-row { display: grid; grid-template-columns: 1fr 70px 100px 34px; gap: 6px; margin-bottom: 6px; }
+.facture-row input { padding: 6px 8px; }

@@ -896,6 +896,7 @@ const optionsHtml = (liste, choisi) => liste.map(v => `<option value="${esc(v)}"
 
 let ongletAchats = 'achats';
 let moisAchats = aujourdHui().slice(0, 7);
+let anneeAchats = false;
 
 vues.achats = () => {
   const onglets = `
@@ -931,22 +932,29 @@ vues.achats = () => {
       </div>`;
   }
 
-  const liste = db.achats.filter(a => a.date.startsWith(moisAchats)).sort((a, b) => b.date.localeCompare(a.date));
+  const prefixe = anneeAchats ? moisAchats.slice(0, 4) : moisAchats;
+  const libellePeriode = anneeAchats ? 'de l\'année' : 'du mois';
+  const liste = db.achats.filter(a => a.date.startsWith(prefixe)).sort((a, b) => b.date.localeCompare(a.date));
   const total = liste.reduce((s, a) => s + totalAchat(a), 0);
   const aPayer = db.achats.filter(a => !a.paye);
   return `
     <div class="toolbar"><h1>Achats</h1>
       <div class="row" style="flex:0 0 auto">
         <input type="month" data-action="mois-achats" value="${moisAchats}" style="width:auto">
+        <select data-action="annee-achats" style="width:auto">
+          <option value="0" ${!anneeAchats ? 'selected' : ''}>Mois</option>
+          <option value="1" ${anneeAchats ? 'selected' : ''}>Année ${moisAchats.slice(0, 4)}</option>
+        </select>
         <button class="btn primary" data-action="ajouter-achat">+ Nouvel achat</button>
       </div>
     </div>
     ${onglets}
     <div class="grid cols-4">
-      <div class="card stat"><div class="label">Achats du mois (TTC)</div><div class="value">${dh(total)}</div></div>
-      <div class="card stat"><div class="label">Factures du mois</div><div class="value">${liste.length}</div></div>
+      <div class="card stat"><div class="label">Achats ${libellePeriode} (TTC)</div><div class="value">${dh(total)}</div></div>
+      <div class="card stat"><div class="label">Factures ${libellePeriode}</div><div class="value">${liste.length}</div></div>
       <div class="card stat"><div class="label">Reste à payer (toutes périodes)</div><div class="value">${dh(aPayer.reduce((s, a) => s + totalAchat(a), 0))}</div></div>
     </div>
+    ${blocHistogrammesAchats(liste, anneeAchats ? null : moisAchats)}
     <div class="card table-wrap" style="margin-top:16px">
       ${liste.length ? `
         <table class="list">
@@ -1445,6 +1453,7 @@ document.addEventListener('change', e => {
   const el = e.target;
   switch (el.dataset.action) {
     case 'mois-achats': if (el.value) { moisAchats = el.value; rendre(); } break;
+    case 'annee-achats': anneeAchats = el.value === '1'; rendre(); break;
     case 'mois-compta': if (el.value) { periodeCompta.mois = el.value; rendre(); } break;
     case 'annee-compta': periodeCompta.annee = el.value === '1'; rendre(); break;
   }
@@ -1665,6 +1674,112 @@ function majTotalFacture() {
   if (el) el.textContent = dh(lireLignesFacture().reduce((s, l) => s + l.qte * l.pu, 0));
 }
 document.addEventListener('input', e => { if (e.target.closest('.facture-row')) majTotalFacture(); });
+
+
+/* ---------- Histogrammes des achats (totaux par intrant) ---------- */
+
+const fmtQte = n => (+n.toFixed(3)).toLocaleString('fr-FR');
+
+// Regroupe les lignes d'achat par produit (sans tenir compte des majuscules)
+function totauxParProduit(achats) {
+  const produits = {};
+  achats.forEach(a => a.lignes.forEach(l => {
+    const cle = l.produit.trim().toLowerCase();
+    const nom = db.stock.find(x => x.nom.toLowerCase() === cle)?.nom || cle.charAt(0).toUpperCase() + l.produit.trim().slice(1);
+    const p = produits[cle] ??= { nom, montant: 0, quantites: {}, nbAchats: 0 };
+    p.montant += Number(l.quantite) * Number(l.pu);
+    const u = l.unite || 'unité';
+    p.quantites[u] = (p.quantites[u] || 0) + Number(l.quantite);
+    p.nbAchats++;
+  }));
+  return Object.values(produits).sort((a, b) => b.montant - a.montant).map(p => {
+    const unites = Object.entries(p.quantites);
+    const qte = unites.map(([u, q]) => `${fmtQte(q)} ${u}`).join(' + ');
+    const prixMoyen = unites.length === 1 && unites[0][1] ? p.montant / unites[0][1] : null;
+    return { ...p, qte, prixMoyen, unite: unites.length === 1 ? unites[0][0] : null };
+  });
+}
+
+// Au-delà de 12 produits, les plus petits sont regroupés dans « Autres produits »
+function barresProduits(produits) {
+  if (!produits.length) return '<div class="empty">Aucun achat sur la période.</div>';
+  const MAX = 12;
+  const affiches = produits.length > MAX ? produits.slice(0, MAX - 1) : produits;
+  const reste = produits.slice(affiches.length);
+  const lignes = affiches.map(p => ({ nom: p.nom, montant: p.montant, detail: p.qte,
+    tip: `${p.nom} : ${dh(p.montant)} — ${p.qte}${p.prixMoyen ? ` — prix moyen ${dh(p.prixMoyen)} / ${p.unite}` : ''} — ${p.nbAchats} achat${p.nbAchats > 1 ? 's' : ''}` }));
+  if (reste.length) {
+    const m = reste.reduce((s, p) => s + p.montant, 0);
+    lignes.push({ nom: `Autres produits (${reste.length})`, montant: m, detail: '', tip: `${reste.map(p => p.nom).join(', ')} : ${dh(m)}` });
+  }
+  const max = Math.max(...lignes.map(l => l.montant)) || 1;
+  return `
+    <div class="hbars">
+      ${lignes.map(l => `
+        <div class="hbar-row hbar-produit" data-tip="${esc(l.tip)}">
+          <span class="hbar-label">${esc(l.nom)}${l.detail ? `<small>${esc(l.detail)}</small>` : ''}</span>
+          <span class="hbar-track"><span class="hbar" style="width:${(l.montant / max) * 100}%;background:var(--series-2)"></span></span>
+          <span class="hbar-value">${dh(l.montant)}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function histoAchatsParMois(annee, moisChoisi) {
+  const mois = MOIS_COURTS.map((_, i) => {
+    const prefixe = `${annee}-${String(i + 1).padStart(2, '0')}`;
+    return { i, prefixe, total: db.achats.filter(a => a.date.startsWith(prefixe)).reduce((s, a) => s + totalAchat(a), 0) };
+  });
+  const plusHaut = Math.max(...mois.map(m => m.total));
+  const pas = pasRond(plusHaut);
+  const max = pas * Math.max(1, Math.ceil(plusHaut / pas));
+  return `
+    <div class="chart">
+      <div class="chart-plot">
+        ${grille(0, max, pas)}
+        <div class="chart-cols">
+          ${mois.map(m => `
+            <div class="col-slot ${m.prefixe === moisChoisi ? 'actif' : ''}" data-tip="${esc(`${MOIS_LONGS[m.i]} : ${dh(m.total)}`)}">
+              <div class="col-bar haut" style="height:${(m.total / max) * 100}%;background:var(--series-2);width:min(20px, 60%)"></div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="chart-xlabels">${mois.map(m => `<span class="${m.prefixe === moisChoisi ? 'actif' : ''}">${MOIS_COURTS[m.i]}</span>`).join('')}</div>
+    </div>`;
+}
+
+function blocHistogrammesAchats(liste, moisChoisi) {
+  const annee = moisAchats.slice(0, 4);
+  const periode = moisChoisi ? `${MOIS_LONGS[Number(moisChoisi.slice(5)) - 1]} ${annee}` : `année ${annee}`;
+  const produits = totauxParProduit(liste);
+  const parFournisseur = Object.entries(liste.reduce((acc, a) => {
+    const f = a.fournisseurId ? nomFournisseur(a.fournisseurId) : 'Sans fournisseur';
+    acc[f] = (acc[f] || 0) + totalAchat(a);
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]);
+  return `
+    <div class="grid cols-2" style="margin-top:16px">
+      <div class="card">
+        <h2>Total acheté par produit — ${periode}</h2>
+        ${barresProduits(produits)}
+      </div>
+      <div class="card">
+        <h2>Achats par mois — ${annee}</h2>
+        ${histoAchatsParMois(annee, moisChoisi)}
+        <h2 style="margin-top:24px">Par fournisseur — ${periode}</h2>
+        ${barresCategories(parFournisseur, '--series-2')}
+      </div>
+    </div>
+    ${produits.length ? `
+      <details class="card" style="margin-top:16px">
+        <summary>Voir le détail par produit</summary>
+        <div class="table-wrap"><table class="list">
+          <tr><th>Produit</th><th class="num">Quantité totale</th><th class="num">Prix moyen</th><th class="num">Nb d'achats</th><th class="num">Montant TTC</th></tr>
+          ${produits.map(p => `<tr><td>${esc(p.nom)}</td><td class="num">${esc(p.qte)}</td>
+            <td class="num">${p.prixMoyen ? `${dh(p.prixMoyen)} / ${esc(p.unite)}` : '—'}</td>
+            <td class="num">${p.nbAchats}</td><td class="num">${dh(p.montant)}</td></tr>`).join('')}
+        </table></div>
+      </details>` : ''}`;
+}
 
 /* =========================================================
    Routage

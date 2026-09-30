@@ -237,3 +237,5 @@ fieldset.variantes legend { color: var(--muted); font-size: .9rem; padding: 0 4p
 details.card summary { cursor: pointer; font-weight: 600; }
 .infobulle { position: fixed; display: none; z-index: 50; pointer-events: none; background: var(--text); color: #fff;
   font-size: .82rem; padding: 6px 10px; border-radius: 6px; max-width: 320px; box-shadow: 0 4px 14px #0003; }
+
+.hbar-produit .hbar-label small { display: block; font-size: .75rem; color: var(--muted); }

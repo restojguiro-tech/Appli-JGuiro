@@ -15,7 +15,7 @@ Aucune installation n'est nécessaire : ouvrez `index.html` dans un navigateur (
 | **Achats** | Fournisseurs, factures d'achat (produits, quantités, prix, TVA, payé / à payer), ajout automatique des quantités au stock, dernier prix d'achat et valeur du stock |
 | **Ventes** | CA TTC/HT, ticket moyen, graphique par jour, meilleures ventes, répartition par moyen de paiement |
 | **Factures** | Factures clients numérotées (F-2026-0001…) à partir d'un ticket encaissé ou en facture libre (traiteur, événement), avec ICE/IF/RC du restaurant, ICE du client, TVA et montant en toutes lettres ; impression et modification |
-| **Comptabilité** | Par mois ou par année : recettes, dépenses, solde, résultat HT, estimation de la TVA à payer, dépenses courantes (loyer, salaires, électricité…), journal et export Excel (CSV) pour le comptable |
+| **Comptabilité** | Par mois ou par année : recettes, dépenses, solde, résultat HT, estimation de la TVA à payer, dépenses courantes (loyer, salaires, électricité…), histogrammes (recettes et dépenses par mois, solde par mois, dépenses et recettes par catégorie), journal et export Excel (CSV) pour le comptable |
 | **Paramètres** | Nom du restaurant, taux de TVA, adresse et mentions légales (ICE, IF, RC, patente, CNSS), export/import de sauvegarde, réinitialisation |
 
 ## Données

@@ -1,4 +1,8 @@
 :root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --negatif: #e34948;
+  --grille: #ebe7e1;
   --bg: #f6f4f0;
   --card: #ffffff;
   --text: #2b2622;
@@ -206,3 +210,30 @@ fieldset.variantes legend { color: var(--muted); font-size: .9rem; padding: 0 4p
 
 .facture-row { display: grid; grid-template-columns: 1fr 70px 100px 34px; gap: 6px; margin-bottom: 6px; }
 .facture-row input { padding: 6px 8px; }
+
+/* Histogrammes (comptabilité) */
+.chart-legend { display: flex; gap: 16px; font-size: .85rem; color: var(--muted); margin-bottom: 8px; }
+.chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.chart-plot { position: relative; height: 200px; margin: 14px 0 0 44px; }
+.grid-line { position: absolute; left: 0; right: 0; border-top: 1px solid var(--grille); }
+.grid-line.zero { border-top-color: var(--muted); }
+.grid-line span { position: absolute; right: calc(100% + 6px); top: -.6em; font-size: .72rem; color: var(--muted); white-space: nowrap; }
+.chart-cols { position: absolute; inset: 0; display: flex; }
+.col-slot { flex: 1; position: relative; display: flex; align-items: flex-end; justify-content: center; gap: 2px; cursor: default; }
+.col-slot:hover, .col-slot.actif { background: #0000000a; }
+.col-slot .col-bar { width: min(14px, 40%); min-height: 0; }
+.col-slot > .col-bar[style*="position:absolute"] { left: 50%; transform: translateX(-50%); width: min(20px, 60%); }
+.col-bar.haut { border-radius: 4px 4px 0 0; }
+.col-bar.bas { border-radius: 0 0 4px 4px; }
+.chart-xlabels { display: flex; margin-left: 44px; margin-top: 4px; }
+.chart-xlabels span { flex: 1; text-align: center; font-size: .72rem; color: var(--muted); }
+.chart-xlabels span.actif { color: var(--text); font-weight: 700; }
+.hbars { display: grid; gap: 8px; }
+.hbar-row { display: grid; grid-template-columns: minmax(90px, 30%) 1fr auto; gap: 10px; align-items: center; font-size: .9rem; }
+.hbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbar-track { height: 14px; }
+.hbar { display: block; height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
+.hbar-value { font-variant-numeric: tabular-nums; color: var(--text); }
+details.card summary { cursor: pointer; font-weight: 600; }
+.infobulle { position: fixed; display: none; z-index: 50; pointer-events: none; background: var(--text); color: #fff;
+  font-size: .82rem; padding: 6px 10px; border-radius: 6px; max-width: 320px; box-shadow: 0 4px 14px #0003; }

@@ -1058,9 +1058,11 @@ function enregistrerAchat(achat, d) {
 
 let periodeCompta = { mois: aujourdHui().slice(0, 7), annee: false };
 
-function mouvementsCompta() {
-  const { mois, annee } = periodeCompta;
-  const dans = ymd => ymd.startsWith(annee ? mois.slice(0, 4) : mois);
+const prefixeCompta = () => (periodeCompta.annee ? periodeCompta.mois.slice(0, 4) : periodeCompta.mois);
+
+// Mouvements dont la date commence par le préfixe (« 2026 » pour une année, « 2026-09 » pour un mois)
+function mouvementsCompta(prefixe = prefixeCompta()) {
+  const dans = ymd => ymd.startsWith(prefixe);
   const tvaResto = Number(db.restaurant.tva) || 0;
   const mvts = [];
 
@@ -1096,6 +1098,161 @@ function mouvementsCompta() {
   return mvts.sort((a, b) => b.date.localeCompare(a.date));
 }
 
+/* ---------- Histogrammes de la comptabilité ---------- */
+
+const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+const MOIS_LONGS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+// Montant court pour les axes : 12 500 → « 12,5 k »
+const dhCourt = n => Math.abs(n) >= 1000
+  ? (n / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' k'
+  : (Math.round(n) || 0).toLocaleString('fr-FR');
+
+// Pas « rond » pour les graduations (1, 2, 2,5 ou 5 × 10^n)
+function pasRond(max, nb = 4) {
+  if (max <= 0) return 1;
+  const brut = max / nb, p = 10 ** Math.floor(Math.log10(brut));
+  return [1, 2, 2.5, 5, 10].map(m => m * p).find(s => s >= brut);
+}
+
+function totauxParMois(annee) {
+  return MOIS_COURTS.map((_, i) => {
+    const prefixe = `${annee}-${String(i + 1).padStart(2, '0')}`;
+    const m = mouvementsCompta(prefixe);
+    const r = m.filter(x => x.sens === 'recette').reduce((s, x) => s + x.ttc, 0);
+    const d = m.filter(x => x.sens === 'depense').reduce((s, x) => s + x.ttc, 0);
+    return { i, prefixe, r, d, solde: r - d };
+  });
+}
+
+// Graduations horizontales + libellés de l'axe vertical
+function grille(min, max, pas) {
+  const lignes = [];
+  for (let v = min; v <= max + pas / 2; v += pas) {
+    const bas = ((v - min) / (max - min)) * 100;
+    lignes.push(`<div class="grid-line ${Math.abs(v) < pas / 2 ? 'zero' : ''}" style="bottom:${bas}%"><span>${dhCourt(v)}</span></div>`);
+  }
+  return lignes.join('');
+}
+
+function histoRecettesDepenses(mois, moisChoisi) {
+  const pas = pasRond(Math.max(...mois.map(m => Math.max(m.r, m.d))));
+  const max = pas * Math.max(1, Math.ceil(Math.max(...mois.map(m => Math.max(m.r, m.d))) / pas));
+  const h = v => (v / max) * 100;
+  return `
+    <div class="chart">
+      <div class="chart-legend">
+        <span><i style="background:var(--series-1)"></i>Recettes</span>
+        <span><i style="background:var(--series-2)"></i>Dépenses</span>
+      </div>
+      <div class="chart-plot">
+        ${grille(0, max, pas)}
+        <div class="chart-cols">
+          ${mois.map(m => `
+            <div class="col-slot ${m.prefixe === moisChoisi ? 'actif' : ''}"
+              data-tip="${esc(`${MOIS_LONGS[m.i]} — Recettes : ${dh(m.r)} · Dépenses : ${dh(m.d)} · Solde : ${dh(m.solde)}`)}">
+              <div class="col-bar haut" style="height:${h(m.r)}%;background:var(--series-1)"></div>
+              <div class="col-bar haut" style="height:${h(m.d)}%;background:var(--series-2)"></div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="chart-xlabels">${mois.map(m => `<span class="${m.prefixe === moisChoisi ? 'actif' : ''}">${MOIS_COURTS[m.i]}</span>`).join('')}</div>
+    </div>`;
+}
+
+function histoSolde(mois, moisChoisi) {
+  const valeurs = mois.map(m => m.solde);
+  const pas = pasRond(Math.max(...valeurs.map(Math.abs)), 3);
+  const min = -pas * Math.max(0, Math.ceil(-Math.min(0, ...valeurs) / pas));
+  let max = pas * Math.max(0, Math.ceil(Math.max(0, ...valeurs) / pas));
+  if (max === min) max = pas;
+  const etendue = max - min;
+  const zero = (-min / etendue) * 100;
+  return `
+    <div class="chart">
+      <div class="chart-legend">
+        <span><i style="background:var(--series-1)"></i>Bénéfice</span>
+        <span><i style="background:var(--negatif)"></i>Perte</span>
+      </div>
+      <div class="chart-plot">
+        ${grille(min, max, pas)}
+        <div class="chart-cols">
+          ${mois.map(m => {
+            const hauteur = (Math.abs(m.solde) / etendue) * 100;
+            const positif = m.solde >= 0;
+            return `
+              <div class="col-slot ${m.prefixe === moisChoisi ? 'actif' : ''}" data-tip="${esc(`${MOIS_LONGS[m.i]} — Solde : ${dh(m.solde)}`)}">
+                <div class="col-bar ${positif ? 'haut' : 'bas'}" style="position:absolute;bottom:${positif ? zero : zero - hauteur}%;
+                  height:${hauteur}%;background:var(${positif ? '--series-1' : '--negatif'})"></div>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="chart-xlabels">${mois.map(m => `<span class="${m.prefixe === moisChoisi ? 'actif' : ''}">${MOIS_COURTS[m.i]}</span>`).join('')}</div>
+    </div>`;
+}
+
+function barresCategories(lignes, couleur) {
+  if (!lignes.length) return '<div class="empty">Aucune donnée sur la période.</div>';
+  const max = Math.max(...lignes.map(l => l[1])) || 1;
+  return `
+    <div class="hbars">
+      ${lignes.map(([cat, v]) => `
+        <div class="hbar-row" data-tip="${esc(`${cat} : ${dh(v)}`)}">
+          <span class="hbar-label">${esc(cat)}</span>
+          <span class="hbar-track"><span class="hbar" style="width:${(v / max) * 100}%;background:var(${couleur})"></span></span>
+          <span class="hbar-value">${dh(v)}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function blocHistogrammes(recettes, depenses, parCategorie) {
+  const annee = periodeCompta.mois.slice(0, 4);
+  const moisChoisi = periodeCompta.annee ? null : periodeCompta.mois;
+  const mois = totauxParMois(annee);
+  const periode = periodeCompta.annee ? `l'année ${annee}` : `${MOIS_LONGS[Number(periodeCompta.mois.slice(5)) - 1]} ${annee}`;
+  return `
+    <div class="grid cols-2" style="margin-top:16px">
+      <div class="card">
+        <h2>Recettes et dépenses par mois — ${annee}</h2>
+        ${histoRecettesDepenses(mois, moisChoisi)}
+      </div>
+      <div class="card">
+        <h2>Solde par mois — ${annee}</h2>
+        ${histoSolde(mois, moisChoisi)}
+      </div>
+    </div>
+    <details class="card" style="margin-top:16px">
+      <summary>Voir les chiffres mois par mois</summary>
+      <div class="table-wrap"><table class="list">
+        <tr><th>Mois</th><th class="num">Recettes</th><th class="num">Dépenses</th><th class="num">Solde</th></tr>
+        ${mois.map(m => `<tr><td>${MOIS_LONGS[m.i]}</td><td class="num">${dh(m.r)}</td><td class="num">${dh(m.d)}</td>
+          <td class="num">${dh(m.solde)}</td></tr>`).join('')}
+      </table></div>
+    </details>
+    <div class="grid cols-2" style="margin-top:16px">
+      <div class="card"><h2>Dépenses par catégorie — ${periode}</h2>${barresCategories(parCategorie(depenses), '--series-2')}</div>
+      <div class="card"><h2>Recettes par catégorie — ${periode}</h2>${barresCategories(parCategorie(recettes), '--series-1')}</div>
+    </div>`;
+}
+
+// Info-bulle au survol des barres
+const infobulle = document.createElement('div');
+infobulle.className = 'infobulle';
+document.body.appendChild(infobulle);
+document.addEventListener('mouseover', e => {
+  const cible = e.target.closest('[data-tip]');
+  if (!cible) { infobulle.style.display = 'none'; return; }
+  infobulle.textContent = cible.dataset.tip;
+  infobulle.style.display = 'block';
+});
+document.addEventListener('mousemove', e => {
+  if (infobulle.style.display !== 'block') return;
+  const x = Math.min(e.clientX + 14, window.innerWidth - infobulle.offsetWidth - 8);
+  infobulle.style.left = x + 'px';
+  infobulle.style.top = (e.clientY + 16) + 'px';
+});
+
 vues.comptabilite = () => {
   const mvts = mouvementsCompta();
   const somme = (liste, f = m => m.ttc) => liste.reduce((s, m) => s + f(m), 0);
@@ -1128,6 +1285,7 @@ vues.comptabilite = () => {
       <div class="card stat"><div class="label">Solde (recettes − dépenses)</div><div class="value">${dh(totalR - totalD)}</div></div>
       <div class="card stat"><div class="label">Résultat hors taxes</div><div class="value">${dh(resultatHT)}</div></div>
     </div>
+    ${blocHistogrammes(recettes, depenses, parCategorie)}
     <div class="grid cols-2" style="margin-top:16px">
       <div class="card">
         <h2>TVA de la période (estimation)</h2>

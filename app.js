@@ -1688,15 +1688,15 @@ function totauxParProduit(achats) {
     const nom = db.stock.find(x => x.nom.toLowerCase() === cle)?.nom || cle.charAt(0).toUpperCase() + l.produit.trim().slice(1);
     const p = produits[cle] ??= { nom, montant: 0, quantites: {}, nbAchats: 0 };
     p.montant += Number(l.quantite) * Number(l.pu);
-    const u = l.unite || 'unité';
+    const u = l.unite || '';
     p.quantites[u] = (p.quantites[u] || 0) + Number(l.quantite);
     p.nbAchats++;
   }));
   return Object.values(produits).sort((a, b) => b.montant - a.montant).map(p => {
     const unites = Object.entries(p.quantites);
-    const qte = unites.map(([u, q]) => `${fmtQte(q)} ${u}`).join(' + ');
+    const qte = unites.map(([u, q]) => `${fmtQte(q)}${u ? ' ' + u : ''}`).join(' + ');
     const prixMoyen = unites.length === 1 && unites[0][1] ? p.montant / unites[0][1] : null;
-    return { ...p, qte, prixMoyen, unite: unites.length === 1 ? unites[0][0] : null };
+    return { ...p, qte, prixMoyen, unite: unites.length === 1 ? (unites[0][0] || 'unité') : null };
   });
 }
 

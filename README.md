@@ -22,6 +22,13 @@ Aucune installation n'est nécessaire.
 | **Comptabilité** | Par mois ou par année : recettes, dépenses, solde, résultat HT, estimation de la TVA à payer, dépenses courantes (loyer, salaires, électricité…), histogrammes (recettes et dépenses par mois, solde par mois, dépenses et recettes par catégorie), journal et export Excel (CSV) pour le comptable |
 | **Paramètres** | Nom du restaurant, taux de TVA, adresse et mentions légales (ICE, IF, RC, patente, CNSS), export/import de sauvegarde, réinitialisation |
 
+## Adresses
+
+- Carte pour les clients : https://jguiro.com/
+- Application de gestion : https://jguiro.com/gestion/
+
+Le fichier `CNAME` relie le site GitHub Pages au domaine jguiro.com (zone DNS chez OVH : 4 entrées A vers 185.199.108-111.153 et `www` en CNAME vers restojguiro-tech.github.io).
+
 ## Données
 
 Les données sont enregistrées **dans le navigateur** (localStorage) de l'appareil utilisé.

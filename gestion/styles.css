@@ -251,3 +251,8 @@ details.card summary { cursor: pointer; font-weight: 600; }
 .partage .qr svg { width: 100%; height: 100%; }
 .etapes { padding-left: 20px; line-height: 2.2; }
 .note-commande { background: #fdf3e1; border-radius: 8px; padding: 6px 10px; font-size: .9rem; }
+
+/* Synchronisation */
+.sync-badge { font-size: 1rem; margin-left: 6px; cursor: help; }
+.erreur-sync { color: var(--danger); }
+.note-sync { background: #dcefe3; color: var(--ok); border-radius: 8px; padding: 8px 12px; }

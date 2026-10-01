@@ -1,0 +1,14 @@
+// Règles de sécurité Firestore : à copier dans la console Firebase → Firestore → Règles.
+// Pour autoriser un autre compte (ex. un employé), ajoutez son e-mail dans les deux listes.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /restaurants/{rid}/elements/{doc} {
+      allow read, write: if request.auth != null && request.auth.token.email in ['restojguiro@gmail.com'];
+    }
+    match /publics/{rid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.email in ['restojguiro@gmail.com'];
+    }
+  }
+}

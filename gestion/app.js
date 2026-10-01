@@ -74,12 +74,18 @@ function charger() {
   return structuredClone(DONNEES_DEMO);
 }
 
-function sauver() {
+function ecrireLocal() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
   } catch (e) {
     alert("Impossible d'enregistrer les données : " + e.message);
   }
+}
+
+// Enregistre sur cet appareil puis envoie les changements aux autres appareils (si la synchronisation est active)
+function sauver() {
+  ecrireLocal();
+  window.syncApi?.programmer();
 }
 
 /* =========================================================
@@ -697,6 +703,7 @@ vues.ventes = () => {
 /* ---------- Paramètres ---------- */
 vues.parametres = () => `
   <h1>Paramètres</h1>
+  ${carteSync()}
   <div class="grid cols-2">
     <div class="card">
       <h2>Restaurant</h2>
@@ -720,7 +727,9 @@ vues.parametres = () => `
     </div>
     <div class="card">
       <h2>Sauvegarde des données</h2>
-      <p class="muted">Les données sont enregistrées dans ce navigateur. Exportez-les régulièrement pour ne rien perdre, ou pour les transférer sur un autre appareil.</p>
+      <p class="muted">${syncEtat.connecte
+        ? 'Les données sont enregistrées dans ce navigateur et synchronisées en ligne. Un export de temps en temps reste une bonne précaution.'
+        : 'Les données sont enregistrées dans ce navigateur. Exportez-les régulièrement pour ne rien perdre, ou pour les transférer sur un autre appareil.'}</p>
       <div class="row" style="flex-wrap:wrap">
         <button class="btn" data-action="exporter">⬇️ Exporter (JSON)</button>
         <label class="btn" style="margin:0;text-align:center;color:var(--text)">⬆️ Importer
@@ -898,6 +907,7 @@ const actions = {
   },
   'reinitialiser': () => {
     if (!confirmer('Effacer TOUTES les données (carte, commandes, réservations, stock) ? Cette action est irréversible.')) return;
+    if (syncEtat.connecte && !confirmer('La synchronisation est active : les données seront aussi effacées sur TOUS les appareils. Continuer ?')) return;
     db = structuredClone(DONNEES_DEMO);
     tableSelectionnee = null;
     sauver(); rendre();
@@ -962,9 +972,12 @@ document.addEventListener('change', e => {
       fichier.text().then(txt => {
         const data = JSON.parse(txt);
         if (!Array.isArray(data.carte) || !Array.isArray(data.commandes)) throw new Error('format inattendu');
-        if (!confirmer('Remplacer toutes les données actuelles par celles du fichier ?')) return;
+        if (!confirmer(syncEtat.connecte
+          ? 'Remplacer toutes les données par celles du fichier, sur TOUS les appareils synchronisés ?'
+          : 'Remplacer toutes les données actuelles par celles du fichier ?')) return;
         db = migrer(data);
         sauver(); rendre();
+        window.syncApi?.envoyerMaintenant();
         alert('Données importées avec succès.');
       }).catch(err => alert('Fichier invalide : ' + err.message));
       break;
@@ -1957,6 +1970,8 @@ vues.menuenligne = () => {
         <p>Regardez la carte telle que vos clients la verront (${nbPlats} plat${nbPlats > 1 ? 's' : ''} disponible${nbPlats > 1 ? 's' : ''}) :</p>
         <p><a class="btn" href="../?apercu" target="_blank" rel="noopener">👀 Aperçu de la carte en ligne</a></p>
         <h2 style="margin-top:20px">3. Publier</h2>
+        ${syncEtat.connecte ? `<p class="note-sync">✅ Synchronisation active : la carte en ligne se met à jour <strong>automatiquement</strong>
+          à chaque changement. Les étapes ci-dessous ne sont plus nécessaires.</p>` : ''}
         <p class="muted small-note">À refaire après chaque changement de la carte ou des réglages.</p>
         <ol class="etapes">
           <li><button class="btn small" data-action="telecharger-menu">⬇️ Télécharger le fichier menu.json</button></li>
@@ -2122,6 +2137,136 @@ document.addEventListener('submit', e => {
   if (!paiementsActifs(db.menuEnLigne).length) db.menuEnLigne.paiements.especes = true;
   sauver(); rendre();
   alert('Réglages enregistrés. Pensez à republier le fichier menu.json.');
+});
+
+/* =========================================================
+   Synchronisation entre appareils (interface ; le moteur est dans sync.js)
+   ========================================================= */
+
+window.syncEtat = {
+  configure: !!window.JGUIRO_SYNC?.firebase,
+  connecte: false, email: '', statut: 'deconnecte', derniere: null, erreur: '',
+};
+const syncEtat = window.syncEtat;
+
+const LIBELLES_SYNC = {
+  deconnecte: ['', 'Non connecté'],
+  connexion: ['⏳', 'Connexion…'],
+  envoi: ['⏳', 'Envoi des changements…'],
+  ok: ['☁️', 'Synchronisé'],
+  hors_ligne: ['📴', 'Hors ligne — les changements seront envoyés au retour de la connexion'],
+  erreur: ['⚠️', 'Erreur de synchronisation'],
+};
+
+function carteSync() {
+  if (!syncEtat.configure) {
+    return `<div class="card" style="margin-bottom:16px">
+      <h2>☁️ Synchronisation entre appareils</h2>
+      <p class="muted">Pas encore configurée : les données restent sur cet appareil. Suivez le guide de mise en place pour l'activer.</p>
+    </div>`;
+  }
+  const [icone, texte] = LIBELLES_SYNC[syncEtat.statut] || ['', syncEtat.statut];
+  if (!syncEtat.connecte) {
+    return `<div class="card" style="margin-bottom:16px">
+      <h2>☁️ Synchronisation entre appareils</h2>
+      <p class="muted">Connectez cet appareil avec le compte du restaurant : les commandes, ventes, achats, la carte…
+        seront partagés en temps réel avec vos autres appareils.</p>
+      <form id="form-sync" class="row" style="flex-wrap:wrap;align-items:flex-end">
+        <label>E-mail<input name="email" type="email" required autocomplete="username" value="${esc(syncEtat.email || localStorage.getItem('jguiro-sync-email') || '')}"></label>
+        <label>Mot de passe<input name="motdepasse" type="password" required autocomplete="current-password"></label>
+        <div style="flex:0 0 auto;margin-bottom:12px;display:flex;gap:8px">
+          <button class="btn primary" type="submit">Se connecter</button>
+          <button class="btn" type="button" data-action="sync-oubli">Mot de passe oublié</button>
+        </div>
+      </form>
+      ${syncEtat.erreur ? `<p class="erreur-sync">⚠️ ${esc(syncEtat.erreur)}</p>` : ''}
+    </div>`;
+  }
+  return `<div class="card" style="margin-bottom:16px">
+    <h2>☁️ Synchronisation entre appareils</h2>
+    <p>Connecté avec <strong>${esc(syncEtat.email)}</strong></p>
+    <p>${icone} ${esc(texte)}${syncEtat.derniere && syncEtat.statut === 'ok' ? ` — ${new Date(syncEtat.derniere).toLocaleTimeString('fr-FR')}` : ''}</p>
+    ${syncEtat.erreur ? `<p class="erreur-sync">⚠️ ${esc(syncEtat.erreur)}</p>` : ''}
+    <button class="btn" data-action="sync-deconnexion">Déconnecter cet appareil</button>
+  </div>`;
+}
+
+// Petit indicateur en haut de l'écran (hors de la zone redessinée)
+function majIndicateurSync() {
+  const el = document.getElementById('sync-badge');
+  if (el) {
+    const [icone, texte] = syncEtat.connecte ? (LIBELLES_SYNC[syncEtat.statut] || ['', '']) : ['', ''];
+    el.textContent = icone;
+    el.title = texte;
+    el.hidden = !icone;
+  }
+  if (vueCourante() === 'parametres') rafraichir();
+}
+
+// Redessine après un changement reçu, sans gêner une saisie en cours
+let rafraichissementEnAttente = null;
+function rafraichir() {
+  clearTimeout(rafraichissementEnAttente);
+  const actif = document.activeElement;
+  const saisie = actif && actif.closest('#app') && /^(INPUT|TEXTAREA|SELECT)$/.test(actif.tagName);
+  if (modal.open || saisie) {
+    rafraichissementEnAttente = setTimeout(rafraichir, 1500);
+    return;
+  }
+  rendre();
+}
+
+// Premier branchement d'un appareil qui a déjà des données : que faire ?
+function demanderChoixSync(nbEnLigne) {
+  return new Promise(resoudre => {
+    let reponse = null;
+    ouvrirModal('Données déjà en ligne', `
+      <p>Le compte contient déjà des données (${nbEnLigne} éléments). Que voulez-vous faire sur cet appareil ?</p>
+      <div class="choix-variantes" style="grid-template-columns:1fr">
+        <button type="button" class="btn" data-choix-sync="en_ligne">⬇️ Utiliser les données en ligne<span class="muted">Recommandé pour un nouvel appareil. Les données de cet appareil sont remplacées.</span></button>
+        <button type="button" class="btn" data-choix-sync="appareil">⬆️ Envoyer les données de cet appareil<span class="muted">Les données en ligne sont remplacées par celles de cet appareil, sur tous les appareils.</span></button>
+      </div>`, null, null);
+    const clic = e => {
+      const b = e.target.closest('[data-choix-sync]');
+      if (!b) return;
+      if (b.dataset.choixSync === 'appareil' && !confirmer('Remplacer les données en ligne (et sur tous les autres appareils) par celles de cet appareil ?')) return;
+      reponse = b.dataset.choixSync;
+      modal.close();
+    };
+    modal.addEventListener('click', clic);
+    modal.addEventListener('close', () => { modal.removeEventListener('click', clic); resoudre(reponse); }, { once: true });
+  });
+}
+
+window.app = {
+  donnees: () => db,
+  ecrireLocal,
+  rafraichir,
+  majIndicateurSync,
+  demanderChoixSync,
+};
+
+Object.assign(actions, {
+  'sync-deconnexion': () => {
+    if (!confirmer('Déconnecter cet appareil ? Ses données restent disponibles, mais ne seront plus partagées.')) return;
+    window.syncApi?.deconnecter();
+  },
+  'sync-oubli': () => {
+    const email = $('#form-sync input[name=email]')?.value.trim();
+    if (!email) return alert("Indiquez d'abord votre e-mail.");
+    window.syncApi?.motDePasseOublie(email)
+      .then(() => alert(`Un e-mail de réinitialisation a été envoyé à ${email}.`))
+      .catch(() => alert("Impossible d'envoyer l'e-mail. Vérifiez l'adresse."));
+  },
+});
+
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'form-sync') return;
+  e.preventDefault();
+  const d = Object.fromEntries(new FormData(e.target));
+  if (!window.syncApi) return alert("Le module de synchronisation n'a pas pu se charger. Vérifiez la connexion internet puis rechargez la page.");
+  try { localStorage.setItem('jguiro-sync-email', d.email.trim()); } catch (err) { /* ignoré */ }
+  window.syncApi.connecter(d.email, d.motdepasse);
 });
 
 /* =========================================================

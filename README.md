@@ -53,3 +53,14 @@ Les données sont enregistrées **dans le navigateur** (localStorage) de l'appar
 À refaire (étape 2) après chaque modification de la carte.
 
 `vendor/qrcode.js` : QR Code Generator for JavaScript, © 2009 Kazuhiko Arase, licence MIT.
+
+## Synchronisation entre appareils (Firebase)
+
+Le fichier `gestion/sync.js` partage les données en temps réel entre tous les appareils connectés au compte du restaurant. Il publie aussi automatiquement la carte en ligne, sans passer par `menu.json`. Chaque appareil garde une copie locale, ce qui lui permet de fonctionner hors ligne.
+
+Mise en place (une seule fois) :
+1. Sur https://console.firebase.google.com, créez un projet (par exemple « jguiro »), sans Google Analytics.
+2. **Authentication → Commencer → E-mail/Mot de passe → Activer**. Ensuite, dans l'onglet **Utilisateurs**, ajoutez le compte `restojguiro@gmail.com` avec un mot de passe.
+3. **Firestore Database → Créer une base de données**, emplacement `eur3 (europe-west)`, en mode production. Dans l'onglet **Règles**, collez le contenu de `firestore.rules` puis cliquez sur **Publier**.
+4. **Paramètres du projet → Vos applications → Web (</>)** : enregistrez l'application, puis copiez `apiKey`, `authDomain`, `projectId` et `appId` dans `firebase-config.js`.
+5. Sur chaque appareil, allez dans **jguiro.com/gestion/ → Paramètres → Synchronisation**, puis connectez-vous. Commencez par le PC qui contient les vraies données.

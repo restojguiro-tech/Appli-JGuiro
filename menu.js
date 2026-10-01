@@ -23,6 +23,19 @@ async function chargerMenu() {
     const brut = localStorage.getItem(MENU_CLE_STOCKAGE);
     if (brut) return construireMenuPublic(JSON.parse(brut));
   }
+  // Carte publiée automatiquement par l'application (synchronisation active), sinon le fichier menu.json
+  const sync = window.JGUIRO_SYNC;
+  if (sync?.firebase) {
+    try {
+      const base = sync.emulateur ? `http://${sync.emulateur.firestore}/v1` : 'https://firestore.googleapis.com/v1';
+      const url = `${base}/projects/${sync.firebase.projectId}/databases/(default)/documents/publics/${sync.restaurantId || 'jguiro'}?key=${sync.firebase.apiKey}`;
+      const r = await fetch(url, { cache: 'no-store' });
+      if (r.ok) {
+        const json = (await r.json()).fields?.json?.stringValue;
+        if (json) return JSON.parse(json);
+      }
+    } catch (e) { /* on se rabat sur menu.json */ }
+  }
   const rep = await fetch('menu.json?t=' + Date.now(), { cache: 'no-store' });
   if (!rep.ok) throw new Error('menu introuvable');
   return rep.json();

@@ -42,7 +42,7 @@ const DONNEES_DEMO = {
   achats: [],
   operations: [],
   factures: [],
-  menuEnLigne: { whatsapp: '', accueil: '', fraisLivraison: 0, modes: { sur_place: true, emporter: true, livraison: true } },
+  menuEnLigne: { whatsapp: '', accueil: '', lienCourt: 'https://sl1nk.com/plh5i18', fraisLivraison: 0, modes: { sur_place: true, emporter: true, livraison: true } },
   stock: [
     { id: 's1', nom: 'Farine', quantite: 10, unite: 'kg', seuil: 3 },
     { id: 's2', nom: 'Beurre', quantite: 2, unite: 'kg', seuil: 2 },
@@ -1883,6 +1883,8 @@ function blocHistogrammesAchats(liste, moisChoisi) {
 
 // Adresse publique de la carte en ligne (même dossier que l'application)
 const urlMenuPublic = () => new URL('menu.html', location.href.split('#')[0]).href;
+// Lien à donner aux clients : le lien court s'il est renseigné, sinon l'adresse complète
+const urlPartage = () => db.menuEnLigne.lienCourt || urlMenuPublic();
 
 // Lien direct vers l'envoi de fichiers sur GitHub (dépôt déduit de l'adresse GitHub Pages)
 function urlEnvoiGitHub() {
@@ -1901,7 +1903,7 @@ function qrCodeSvg(texte) {
 
 vues.menuenligne = () => {
   const cfg = db.menuEnLigne;
-  const url = urlMenuPublic();
+  const url = urlPartage();
   const nbPlats = db.carte.filter(p => p.disponible).length;
   return `
     <div class="toolbar"><h1>Menu en ligne</h1>
@@ -1914,6 +1916,9 @@ vues.menuenligne = () => {
         <form id="form-menu-en-ligne">
           <label>Numéro WhatsApp du restaurant (format international, sans le +)
             <input name="whatsapp" inputmode="tel" placeholder="Ex. : 212612345678" value="${esc(cfg.whatsapp)}" required></label>
+          <label>Lien court vers la carte (facultatif)
+            <input name="lienCourt" type="url" placeholder="Ex. : https://bit.ly/…" value="${esc(cfg.lienCourt)}"></label>
+          <p class="muted small-note">Il doit mener vers : ${esc(urlMenuPublic())}</p>
           <label>Message d'accueil (facultatif)<input name="accueil" placeholder="Ex. : Ouvert tous les jours de 12 h à 23 h" value="${esc(cfg.accueil)}"></label>
           <p class="muted small-note">Modes proposés aux clients :</p>
           <div class="row" style="flex-wrap:wrap">
@@ -2007,7 +2012,7 @@ function imprimerQr() {
     <style>body{font-family:Arial,sans-serif;text-align:center;padding:40px}h1{margin:0 0 8px}svg{width:320px;height:320px}
     p{font-size:18px}.url{font-size:12px;color:#555;word-break:break-all}</style></head><body>
     <h1>${esc(db.restaurant.nom)}</h1><p>📱 Scannez pour voir la carte et commander</p>
-    ${qrCodeSvg(urlMenuPublic())}<p class="url">${esc(urlMenuPublic())}</p>
+    ${qrCodeSvg(urlPartage())}<p class="url">${esc(urlPartage())}</p>
     <script>window.onload = () => window.print()<\/script></body></html>`);
   w.document.close();
 }
@@ -2023,7 +2028,7 @@ Object.assign(actions, {
     URL.revokeObjectURL(a.href);
   },
   'copier-lien-menu': () => {
-    navigator.clipboard?.writeText(urlMenuPublic()).then(() => alert('Lien copié.'), () => prompt('Copiez le lien :', urlMenuPublic()));
+    navigator.clipboard?.writeText(urlPartage()).then(() => alert('Lien copié.'), () => prompt('Copiez le lien :', urlPartage()));
   },
   'imprimer-qr': imprimerQr,
   'importer-whatsapp': () => ouvrirModal('Importer une commande WhatsApp', `
@@ -2045,6 +2050,7 @@ document.addEventListener('submit', e => {
   db.menuEnLigne = {
     whatsapp: d.whatsapp.replace(/\D/g, '').replace(/^00/, ''),
     accueil: d.accueil.trim(),
+    lienCourt: d.lienCourt.trim(),
     fraisLivraison: Number(d.fraisLivraison) || 0,
     modes: Object.fromEntries(Object.keys(MODES).map(k => [k, !!d['mode_' + k]])),
   };

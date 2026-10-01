@@ -1884,7 +1884,7 @@ function blocHistogrammesAchats(liste, moisChoisi) {
    ========================================================= */
 
 // Adresse publique de la carte en ligne (même dossier que l'application)
-const urlMenuPublic = () => new URL('menu.html', location.href.split('#')[0]).href;
+const urlMenuPublic = () => new URL('../', location.href.split('#')[0]).href;
 // Lien à donner aux clients : le lien court s'il est renseigné, sinon l'adresse complète
 const urlPartage = () => db.menuEnLigne.lienCourt || urlMenuPublic();
 
@@ -1935,7 +1935,7 @@ vues.menuenligne = () => {
       <div class="card">
         <h2>2. Vérifier</h2>
         <p>Regardez la carte telle que vos clients la verront (${nbPlats} plat${nbPlats > 1 ? 's' : ''} disponible${nbPlats > 1 ? 's' : ''}) :</p>
-        <p><a class="btn" href="menu.html?apercu" target="_blank" rel="noopener">👀 Aperçu de la carte en ligne</a></p>
+        <p><a class="btn" href="../?apercu" target="_blank" rel="noopener">👀 Aperçu de la carte en ligne</a></p>
         <h2 style="margin-top:20px">3. Publier</h2>
         <p class="muted small-note">À refaire après chaque changement de la carte ou des réglages.</p>
         <ol class="etapes">

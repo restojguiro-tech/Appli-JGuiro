@@ -2,43 +2,66 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>JGuiro — Gestion du restaurant</title>
-  <link rel="stylesheet" href="styles.css?v=2026-10-02b">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Notre carte — Commander</title>
+  <meta name="theme-color" content="#2b2622">
+  <link rel="stylesheet" href="menu.css?v=2026-10-03">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">🍽️ <span>JGuiro</span></div>
-    <nav id="nav">
-      <a href="#tableau">Tableau de bord</a>
-      <a href="#commandes">Commandes</a>
-      <a href="#carte">Carte</a>
-      <a href="#reservations">Réservations</a>
-      <a href="#stock">Stock</a>
-      <a href="#achats">Achats</a>
-      <a href="#ventes">Ventes</a>
-      <a href="#factures">Factures</a>
-      <a href="#menuenligne">Menu en ligne</a>
-      <a href="#comptabilite">Comptabilité</a>
-      <a href="#parametres">Paramètres</a>
-    </nav>
+  <header class="entete">
+    <h1 id="nom-resto">Notre carte</h1>
+    <p id="infos-resto"></p>
+    <p id="accueil"></p>
   </header>
 
-  <main id="app"></main>
+  <nav id="categories" class="categories" aria-label="Catégories"></nav>
 
-  <dialog id="modal">
-    <form method="dialog" id="modal-form">
-      <h2 id="modal-title"></h2>
-      <div id="modal-body"></div>
+  <main id="carte">
+    <p class="vide">Chargement de la carte…</p>
+  </main>
+
+  <button id="barre-panier" class="barre-panier" hidden>
+    <span>🛒 Voir mon panier · <span id="nb-articles">0</span> article(s)</span>
+    <strong id="total-barre">0,00 DH</strong>
+  </button>
+
+  <!-- Choix du prix / de la variante -->
+  <dialog id="options" class="feuille">
+    <form method="dialog">
+      <h2 id="options-titre"></h2>
+      <div id="options-corps"></div>
       <div class="actions">
-        <button type="button" class="btn ghost" id="modal-cancel">Annuler</button>
-        <button type="submit" class="btn primary" id="modal-ok">Enregistrer</button>
+        <button value="annuler" class="btn">Annuler</button>
+        <button value="ok" id="options-ok" class="btn primaire">Ajouter</button>
       </div>
     </form>
   </dialog>
 
-  <script src="vendor/qrcode.js?v=2026-10-02b"></script>
-  <script src="menu-commun.js?v=2026-10-02b"></script>
-  <script src="app.js?v=2026-10-02b"></script>
+  <!-- Panier et envoi -->
+  <dialog id="panier" class="feuille">
+    <form id="form-panier">
+      <div class="feuille-entete">
+        <h2>Mon panier</h2>
+        <button type="button" class="fermer" data-fermer aria-label="Fermer">✕</button>
+      </div>
+      <div id="lignes-panier"></div>
+      <div class="total"><span>Total</span><strong id="total-panier">0,00 DH</strong></div>
+
+      <fieldset>
+        <legend>Comment souhaitez-vous commander ?</legend>
+        <div id="choix-modes" class="choix-modes"></div>
+      </fieldset>
+
+      <div id="champs-client"></div>
+      <label>Remarque (allergies, cuisson, heure de retrait…)
+        <textarea name="note" rows="2"></textarea>
+      </label>
+      <p class="petit">Votre commande sera envoyée au restaurant par WhatsApp. Le paiement se fait au restaurant ou à la livraison.</p>
+      <button type="submit" class="btn whatsapp">Envoyer ma commande par WhatsApp</button>
+    </form>
+  </dialog>
+
+  <script src="menu-commun.js?v=2026-10-03"></script>
+  <script src="menu.js?v=2026-10-03"></script>
 </body>
 </html>

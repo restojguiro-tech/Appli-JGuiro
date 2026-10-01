@@ -1,7 +1,10 @@
 # JGuiro — Application de gestion du restaurant
 
 Application web simple, en français, pour gérer le restaurant au quotidien.
-Aucune installation n'est nécessaire : ouvrez `index.html` dans un navigateur (Chrome, Firefox, Edge, Safari), sur ordinateur ou tablette.
+Aucune installation n'est nécessaire.
+
+- **Carte pour les clients** : page d'accueil du site (`index.html`).
+- **Application de gestion** : dossier `gestion/` (`gestion/index.html`), à ouvrir sur ordinateur ou tablette.
 
 ## Fonctionnalités
 
@@ -15,7 +18,7 @@ Aucune installation n'est nécessaire : ouvrez `index.html` dans un navigateur (
 | **Achats** | Fournisseurs, factures d'achat (produits, quantités, prix, TVA, payé / à payer), ajout automatique des quantités au stock, dernier prix d'achat et valeur du stock ; histogrammes par mois ou par année : total acheté par produit (montant, quantité, prix moyen), achats par mois et par fournisseur |
 | **Ventes** | CA TTC/HT, ticket moyen, graphique par jour, meilleures ventes, répartition par moyen de paiement et par mode de service |
 | **Factures** | Factures clients numérotées (F-2026-0001…) à partir d'un ticket encaissé ou en facture libre (traiteur, événement), avec ICE/IF/RC du restaurant, ICE du client, TVA et montant en toutes lettres ; impression et modification |
-| **Menu en ligne** | Carte publique pour les clients (`menu.html`) : panier, choix sur place / à emporter / livraison, envoi de la commande par WhatsApp ; QR code à imprimer pour les tables ; import du message WhatsApp dans les commandes en un clic |
+| **Menu en ligne** | Carte publique pour les clients (page d'accueil du site) : panier, choix sur place / à emporter / livraison, envoi de la commande par WhatsApp ; QR code à imprimer pour les tables ; import du message WhatsApp dans les commandes en un clic |
 | **Comptabilité** | Par mois ou par année : recettes, dépenses, solde, résultat HT, estimation de la TVA à payer, dépenses courantes (loyer, salaires, électricité…), histogrammes (recettes et dépenses par mois, solde par mois, dépenses et recettes par catégorie), journal et export Excel (CSV) pour le comptable |
 | **Paramètres** | Nom du restaurant, taux de TVA, adresse et mentions légales (ICE, IF, RC, patente, CNSS), export/import de sauvegarde, réinitialisation |
 
@@ -28,15 +31,16 @@ Les données sont enregistrées **dans le navigateur** (localStorage) de l'appar
 
 ## Fichiers
 
-- `index.html` : structure de la page
-- `styles.css` : apparence
-- `app.js` : logique de l'application
+- `index.html`, `menu.js`, `menu.css` : carte en ligne pour les clients (`menu.html` redirige vers la page d'accueil)
+- `menu.json` : carte publiée (générée depuis l'application)
+- `menu-commun.js` : code partagé entre la carte et l'application
+- `gestion/` : application de gestion (`index.html`, `styles.css`, `app.js`)
 
 ## Carte en ligne pour les clients
 
 1. Dans **Menu en ligne**, indiquez le numéro WhatsApp du restaurant et enregistrez.
 2. Cliquez sur **Télécharger le fichier menu.json**, puis sur **Ouvrir GitHub** et déposez ce fichier dans le dépôt (bouton *Commit changes*).
-3. La carte est alors visible sur `menu.html` (même adresse que l'application). Partagez le lien ou imprimez le QR code.
+3. La carte est alors visible sur la page d'accueil du site (l'application de gestion est dans `gestion/`). Partagez le lien ou imprimez le QR code.
 4. Quand un client envoie sa commande par WhatsApp, copiez son message et collez-le dans **Importer une commande WhatsApp** : la commande est créée automatiquement.
 
 À refaire (étape 2) après chaque modification de la carte.

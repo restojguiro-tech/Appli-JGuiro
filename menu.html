@@ -2,66 +2,12 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Notre carte — Commander</title>
-  <meta name="theme-color" content="#2b2622">
-  <link rel="stylesheet" href="menu.css?v=2026-10-01c">
+  <title>Notre carte</title>
+  <meta http-equiv="refresh" content="0; url=./">
+  <link rel="canonical" href="./">
+  <script>location.replace('./' + location.search + location.hash);</script>
 </head>
 <body>
-  <header class="entete">
-    <h1 id="nom-resto">Notre carte</h1>
-    <p id="infos-resto"></p>
-    <p id="accueil"></p>
-  </header>
-
-  <nav id="categories" class="categories" aria-label="Catégories"></nav>
-
-  <main id="carte">
-    <p class="vide">Chargement de la carte…</p>
-  </main>
-
-  <button id="barre-panier" class="barre-panier" hidden>
-    <span>🛒 Voir mon panier · <span id="nb-articles">0</span> article(s)</span>
-    <strong id="total-barre">0,00 DH</strong>
-  </button>
-
-  <!-- Choix du prix / de la variante -->
-  <dialog id="options" class="feuille">
-    <form method="dialog">
-      <h2 id="options-titre"></h2>
-      <div id="options-corps"></div>
-      <div class="actions">
-        <button value="annuler" class="btn">Annuler</button>
-        <button value="ok" id="options-ok" class="btn primaire">Ajouter</button>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- Panier et envoi -->
-  <dialog id="panier" class="feuille">
-    <form id="form-panier">
-      <div class="feuille-entete">
-        <h2>Mon panier</h2>
-        <button type="button" class="fermer" data-fermer aria-label="Fermer">✕</button>
-      </div>
-      <div id="lignes-panier"></div>
-      <div class="total"><span>Total</span><strong id="total-panier">0,00 DH</strong></div>
-
-      <fieldset>
-        <legend>Comment souhaitez-vous commander ?</legend>
-        <div id="choix-modes" class="choix-modes"></div>
-      </fieldset>
-
-      <div id="champs-client"></div>
-      <label>Remarque (allergies, cuisson, heure de retrait…)
-        <textarea name="note" rows="2"></textarea>
-      </label>
-      <p class="petit">Votre commande sera envoyée au restaurant par WhatsApp. Le paiement se fait au restaurant ou à la livraison.</p>
-      <button type="submit" class="btn whatsapp">Envoyer ma commande par WhatsApp</button>
-    </form>
-  </dialog>
-
-  <script src="menu-commun.js?v=2026-10-01c"></script>
-  <script src="menu.js?v=2026-10-01c"></script>
+  <p><a href="./">Voir la carte</a></p>
 </body>
 </html>

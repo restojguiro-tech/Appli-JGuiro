@@ -348,7 +348,10 @@ function vuePriseCommande(tableId) {
 vues.carte = () => `
   <div class="toolbar">
     <h1>Carte</h1>
-    <button class="btn primary" data-action="ajouter-plat">+ Nouveau plat</button>
+    <div class="row" style="flex:0 0 auto;flex-wrap:wrap">
+      <button class="btn" data-action="recuperer-carte" title="Copier sur cet appareil la carte publiée sur le site">🔄 Récupérer la carte en ligne</button>
+      <button class="btn primary" data-action="ajouter-plat">+ Nouveau plat</button>
+    </div>
   </div>
   ${categories().map(cat => `
     <div class="card" style="margin-bottom:16px">
@@ -1913,7 +1916,10 @@ vues.menuenligne = () => {
   const nbPlats = db.carte.filter(p => p.disponible).length;
   return `
     <div class="toolbar"><h1>Menu en ligne</h1>
-      <button class="btn primary" data-action="importer-whatsapp">📥 Importer une commande WhatsApp</button></div>
+      <div class="row" style="flex:0 0 auto;flex-wrap:wrap">
+        <button class="btn" data-action="recuperer-carte">🔄 Récupérer la carte en ligne</button>
+        <button class="btn primary" data-action="importer-whatsapp">📥 Importer une commande WhatsApp</button>
+      </div></div>
     <p class="muted">Vos clients consultent la carte sur leur téléphone, composent leur panier et vous envoient la commande par WhatsApp.
       Ensuite, collez le message reçu avec « Importer une commande WhatsApp » : la commande se crée toute seule.</p>
     <div class="grid cols-2">
@@ -2023,6 +2029,40 @@ function importerCommande(data) {
   return manquants;
 }
 
+// Copie sur cet appareil la carte publiée (menu.json) : utile pour avoir la même carte sur le téléphone et le PC
+async function recupererCartePubliee() {
+  let m;
+  try {
+    const rep = await fetch(new URL('menu.json', urlMenuPublic()).href + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!rep.ok) throw new Error(rep.status);
+    m = await rep.json();
+  } catch (e) {
+    return alert("Impossible de récupérer la carte publiée. Vérifiez la connexion internet, ou que la carte a bien été publiée (Menu en ligne → Publier).");
+  }
+  const publieeLe = m.genereLe ? new Date(m.genereLe).toLocaleString('fr-FR') : '?';
+  if (!confirmer(`Remplacer la carte de cet appareil (${db.carte.length} plats) par la carte publiée en ligne (${m.plats.length} plats, publiée le ${publieeLe}) ?\n\nLes ventes, achats et autres données ne sont pas modifiés.`)) return;
+
+  db.carte = m.plats.map(p => ({
+    id: p.id, nom: p.nom, categorie: p.categorie, prix: Number(p.prix), disponible: true,
+    tailles: (p.tailles || []).map(t => ({ nom: t.nom || '', prix: Number(t.prix) })),
+    variantes: (p.variantes || []).map(v => ({ nom: v.nom, supplement: Number(v.supplement) || 0 })),
+  }));
+  ['nom', 'adresse', 'telephone'].forEach(k => { if (m.restaurant?.[k]) db.restaurant[k] = m.restaurant[k]; });
+  (m.tables || []).forEach(nom => {
+    if (!db.tables.some(t => t.nom === nom)) db.tables.push({ id: uid(), nom, places: 4 });
+  });
+  Object.assign(db.menuEnLigne, {
+    whatsapp: m.whatsapp || db.menuEnLigne.whatsapp,
+    accueil: m.accueil ?? db.menuEnLigne.accueil,
+    fraisLivraison: Number(m.fraisLivraison) || 0,
+    lienPaiement: m.lienPaiement || db.menuEnLigne.lienPaiement,
+  });
+  if (Array.isArray(m.modes)) db.menuEnLigne.modes = Object.fromEntries(Object.keys(MODES).map(k => [k, m.modes.includes(k)]));
+  if (Array.isArray(m.paiements)) db.menuEnLigne.paiements = Object.fromEntries(Object.keys(MENU_PAIEMENTS).map(k => [k, m.paiements.includes(k)]));
+  sauver(); rendre();
+  alert(`Carte mise à jour : ${db.carte.length} plats.`);
+}
+
 function imprimerQr() {
   const w = window.open('', '_blank', 'width=600,height=800');
   if (!w) return alert('Autorisez les fenêtres pop-up pour imprimer le QR code.');
@@ -2036,6 +2076,7 @@ function imprimerQr() {
 }
 
 Object.assign(actions, {
+  'recuperer-carte': recupererCartePubliee,
   'telecharger-menu': () => {
     if (!db.menuEnLigne.whatsapp) return alert("Indiquez d'abord le numéro WhatsApp du restaurant dans les réglages.");
     const blob = new Blob([JSON.stringify(construireMenuPublic(db), null, 1)], { type: 'application/json' });

@@ -15,6 +15,7 @@ Aucune installation n'est nécessaire : ouvrez `index.html` dans un navigateur (
 | **Achats** | Fournisseurs, factures d'achat (produits, quantités, prix, TVA, payé / à payer), ajout automatique des quantités au stock, dernier prix d'achat et valeur du stock ; histogrammes par mois ou par année : total acheté par produit (montant, quantité, prix moyen), achats par mois et par fournisseur |
 | **Ventes** | CA TTC/HT, ticket moyen, graphique par jour, meilleures ventes, répartition par moyen de paiement et par mode de service |
 | **Factures** | Factures clients numérotées (F-2026-0001…) à partir d'un ticket encaissé ou en facture libre (traiteur, événement), avec ICE/IF/RC du restaurant, ICE du client, TVA et montant en toutes lettres ; impression et modification |
+| **Menu en ligne** | Carte publique pour les clients (`menu.html`) : panier, choix sur place / à emporter / livraison, envoi de la commande par WhatsApp ; QR code à imprimer pour les tables ; import du message WhatsApp dans les commandes en un clic |
 | **Comptabilité** | Par mois ou par année : recettes, dépenses, solde, résultat HT, estimation de la TVA à payer, dépenses courantes (loyer, salaires, électricité…), histogrammes (recettes et dépenses par mois, solde par mois, dépenses et recettes par catégorie), journal et export Excel (CSV) pour le comptable |
 | **Paramètres** | Nom du restaurant, taux de TVA, adresse et mentions légales (ICE, IF, RC, patente, CNSS), export/import de sauvegarde, réinitialisation |
 
@@ -30,3 +31,14 @@ Les données sont enregistrées **dans le navigateur** (localStorage) de l'appar
 - `index.html` : structure de la page
 - `styles.css` : apparence
 - `app.js` : logique de l'application
+
+## Carte en ligne pour les clients
+
+1. Dans **Menu en ligne**, indiquez le numéro WhatsApp du restaurant et enregistrez.
+2. Cliquez sur **Télécharger le fichier menu.json**, puis sur **Ouvrir GitHub** et déposez ce fichier dans le dépôt (bouton *Commit changes*).
+3. La carte est alors visible sur `menu.html` (même adresse que l'application). Partagez le lien ou imprimez le QR code.
+4. Quand un client envoie sa commande par WhatsApp, copiez son message et collez-le dans **Importer une commande WhatsApp** : la commande est créée automatiquement.
+
+À refaire (étape 2) après chaque modification de la carte.
+
+`vendor/qrcode.js` : QR Code Generator for JavaScript, © 2009 Kazuhiko Arase, licence MIT.

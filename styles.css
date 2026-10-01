@@ -244,3 +244,10 @@ details.card summary { cursor: pointer; font-weight: 600; }
 .onglets.modes { flex-wrap: wrap; }
 .onglets.modes .btn { font-weight: 600; }
 .compteur { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 4px; border-radius: 999px; background: #0000001f; font-size: .8rem; }
+
+/* Menu en ligne */
+.partage { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.partage .qr { width: 200px; height: 200px; flex: 0 0 auto; }
+.partage .qr svg { width: 100%; height: 100%; }
+.etapes { padding-left: 20px; line-height: 2.2; }
+.note-commande { background: #fdf3e1; border-radius: 8px; padding: 6px 10px; font-size: .9rem; }

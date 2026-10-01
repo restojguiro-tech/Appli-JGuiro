@@ -42,6 +42,7 @@ const DONNEES_DEMO = {
   achats: [],
   operations: [],
   factures: [],
+  menuEnLigne: { whatsapp: '', accueil: '', fraisLivraison: 0, modes: { sur_place: true, emporter: true, livraison: true } },
   stock: [
     { id: 's1', nom: 'Farine', quantite: 10, unite: 'kg', seuil: 3 },
     { id: 's2', nom: 'Beurre', quantite: 2, unite: 'kg', seuil: 2 },
@@ -56,6 +57,7 @@ let db = charger();
 function migrer(data) {
   const d = { ...structuredClone(DONNEES_DEMO), ...data };
   d.restaurant = { ...structuredClone(DONNEES_DEMO.restaurant), ...d.restaurant };
+  d.menuEnLigne = { ...structuredClone(DONNEES_DEMO.menuEnLigne), ...d.menuEnLigne };
   return d;
 }
 
@@ -227,6 +229,7 @@ vues.commandes = () => {
   const enCours = type => db.commandes.filter(c => c.statut === 'ouverte' && modeDe(c) === type);
   const onglets = `
     <div class="onglets modes">
+      <button class="btn" data-action="importer-whatsapp" style="margin-left:auto;order:2">📥 Commande WhatsApp</button>
       ${Object.entries(MODES).map(([k, m]) => {
         const n = enCours(k).length;
         return `<button class="btn ${modeSalle === k ? 'primary' : ''}" data-action="mode-salle" data-mode="${k}">
@@ -316,6 +319,7 @@ function vuePriseCommande(tableId) {
       <div class="card" id="ticket">
         <h2>Ticket</h2>
         ${c ? `<p class="muted">Ouvert à ${fmtHeure(c.ouverteLe)}</p>` : ''}
+        ${c?.note ? `<p class="note-commande">📝 ${esc(c.note)}</p>` : ''}
         ${lignes.length ? lignes.map((l, i) => `
           <div class="ticket-line">
             <button class="btn qty-btn" data-action="moins" data-i="${i}">−</button>
@@ -428,13 +432,18 @@ function ajouterLigne(plat, taille, variante) {
       lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString(), type: 'sur_place' };
     db.commandes.push(c);
   }
+  ajouterLigneA(c, plat, taille, variante, 1);
+  sauver(); rendre();
+}
+
+function ajouterLigneA(c, plat, taille, variante, qte) {
   const nomTaille = taille?.nom || null;
   const nomVariante = variante ? variante.nom : null;
   const prixBase = Number(taille ? taille.prix : plat.prix);
   const prix = prixBase + (variante ? variante.supplement : 0);
   const ligne = c.lignes.find(l => l.platId === plat.id && (l.taille || null) === nomTaille
     && (l.variante || null) === nomVariante && l.prix === prix);
-  if (ligne) ligne.qte++;
+  if (ligne) ligne.qte += qte;
   else c.lignes.push({
     platId: plat.id,
     taille: nomTaille,
@@ -442,9 +451,8 @@ function ajouterLigne(plat, taille, variante) {
     nom: plat.nom + (nomTaille ? ` — ${nomTaille}` : taille ? ` ${dh(taille.prix)}` : '') + (variante ? ` (${variante.nom})` : ''),
     supplement: variante ? variante.supplement : 0,
     prix,
-    qte: 1,
+    qte,
   });
-  sauver(); rendre();
 }
 
 // Demande le prix (si le plat en a plusieurs) puis la variante, avant d'ajouter la ligne.
@@ -732,13 +740,8 @@ const actions = {
     const type = modeSalle;
     const livraison = type === 'livraison';
     ouvrirModal(livraison ? 'Nouvelle commande à livrer' : 'Nouvelle commande à emporter', formClient({}, livraison), d => {
-      const jour = aujourdHui();
-      const numero = db.commandes.filter(c => modeDe(c) !== 'sur_place' && jourDe(c.ouverteLe) === jour).length + 1;
-      const client = lireClient(d);
-      const c = { id: uid(), tableId: 'ext-' + uid(), type, client, lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString(),
-        tableNom: `${MODES[type].libelle} n° ${numero}${client.nom ? ' — ' + client.nom : ''}` };
+      const c = creerCommandeExterne(type, lireClient(d));
       if (livraison && Number(d.frais) > 0) c.lignes.push({ platId: null, nom: 'Frais de livraison', prix: Number(d.frais), supplement: 0, qte: 1 });
-      db.commandes.push(c);
       tableSelectionnee = c.tableId;
     }, 'Créer la commande');
   },
@@ -921,7 +924,8 @@ function imprimerAddition(c) {
     <h2>${esc(db.restaurant.nom)}</h2>
     <div class="c">${esc(c.tableNom)} — ${new Date().toLocaleString('fr-FR')}</div>
     ${modeDe(c) !== 'sur_place' ? `<div class="c">${MODES[modeDe(c)].libelle}${c.client?.tel ? ' — ' + esc(c.client.tel) : ''}</div>` : ''}
-    ${c.client?.adresse ? `<div class="c">${esc(c.client.adresse)}</div>` : ''}<hr>
+    ${c.client?.adresse ? `<div class="c">${esc(c.client.adresse)}</div>` : ''}
+    ${c.note ? `<div class="c">Remarque : ${esc(c.note)}</div>` : ''}<hr>
     ${c.lignes.map(l => `<div class="l"><span>${l.qte} × ${esc(l.nom)}</span><span>${dh(l.qte * l.prix)}</span></div>`).join('')}
     <hr><div class="l"><span>Total HT</span><span>${dh(ht)}</span></div>
     <div class="l"><span>TVA ${tva} %</span><span>${dh(total - ht)}</span></div>
@@ -1874,6 +1878,182 @@ function blocHistogrammesAchats(liste, moisChoisi) {
 }
 
 /* =========================================================
+   Menu en ligne (front office clients) et import des commandes WhatsApp
+   ========================================================= */
+
+// Adresse publique de la carte en ligne (même dossier que l'application)
+const urlMenuPublic = () => new URL('menu.html', location.href.split('#')[0]).href;
+
+// Lien direct vers l'envoi de fichiers sur GitHub (dépôt déduit de l'adresse GitHub Pages)
+function urlEnvoiGitHub() {
+  const m = /^([^.]+)\.github\.io$/.exec(location.hostname);
+  const depot = m ? `${m[1]}/${location.pathname.split('/')[1]}` : 'restojguiro-tech/Appli-JGuiro';
+  return `https://github.com/${depot}/upload/claude/festive-goodall-ja1s1s`;
+}
+
+function qrCodeSvg(texte) {
+  if (typeof qrcode !== 'function') return '';
+  const qr = qrcode(0, 'M');
+  qr.addData(texte);
+  qr.make();
+  return qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
+}
+
+vues.menuenligne = () => {
+  const cfg = db.menuEnLigne;
+  const url = urlMenuPublic();
+  const nbPlats = db.carte.filter(p => p.disponible).length;
+  return `
+    <div class="toolbar"><h1>Menu en ligne</h1>
+      <button class="btn primary" data-action="importer-whatsapp">📥 Importer une commande WhatsApp</button></div>
+    <p class="muted">Vos clients consultent la carte sur leur téléphone, composent leur panier et vous envoient la commande par WhatsApp.
+      Ensuite, collez le message reçu avec « Importer une commande WhatsApp » : la commande se crée toute seule.</p>
+    <div class="grid cols-2">
+      <div class="card">
+        <h2>1. Réglages</h2>
+        <form id="form-menu-en-ligne">
+          <label>Numéro WhatsApp du restaurant (format international, sans le +)
+            <input name="whatsapp" inputmode="tel" placeholder="Ex. : 212612345678" value="${esc(cfg.whatsapp)}" required></label>
+          <label>Message d'accueil (facultatif)<input name="accueil" placeholder="Ex. : Ouvert tous les jours de 12 h à 23 h" value="${esc(cfg.accueil)}"></label>
+          <p class="muted small-note">Modes proposés aux clients :</p>
+          <div class="row" style="flex-wrap:wrap">
+            ${Object.entries(MODES).map(([k, m]) => `
+              <label style="flex:0 0 auto"><input type="checkbox" name="mode_${k}" style="width:auto" ${cfg.modes[k] !== false ? 'checked' : ''}> ${m.icone} ${m.libelle}</label>`).join('')}
+          </div>
+          <label>Frais de livraison (DH)<input name="fraisLivraison" type="number" step="0.01" min="0" value="${esc(cfg.fraisLivraison || 0)}"></label>
+          <button class="btn primary" type="submit">Enregistrer</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>2. Vérifier</h2>
+        <p>Regardez la carte telle que vos clients la verront (${nbPlats} plat${nbPlats > 1 ? 's' : ''} disponible${nbPlats > 1 ? 's' : ''}) :</p>
+        <p><a class="btn" href="menu.html?apercu" target="_blank" rel="noopener">👀 Aperçu de la carte en ligne</a></p>
+        <h2 style="margin-top:20px">3. Publier</h2>
+        <p class="muted small-note">À refaire après chaque changement de la carte ou des réglages.</p>
+        <ol class="etapes">
+          <li><button class="btn small" data-action="telecharger-menu">⬇️ Télécharger le fichier menu.json</button></li>
+          <li><a class="btn small" href="${esc(urlEnvoiGitHub())}" target="_blank" rel="noopener">⬆️ Ouvrir GitHub</a>
+            puis glissez le fichier <strong>menu.json</strong> dans la page et cliquez sur <strong>Commit changes</strong>.</li>
+          <li>Après une ou deux minutes, la carte en ligne est à jour.</li>
+        </ol>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h2>4. Partager avec vos clients</h2>
+      <div class="partage">
+        <div class="qr">${qrCodeSvg(url)}</div>
+        <div>
+          <p>Adresse de la carte en ligne :</p>
+          <p><a href="${esc(url)}" target="_blank" rel="noopener"><strong>${esc(url)}</strong></a></p>
+          <p style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="btn small" data-action="copier-lien-menu">📋 Copier le lien</button>
+            <button class="btn small" data-action="imprimer-qr">🖨️ Imprimer le QR code (pour les tables)</button>
+          </p>
+          <p class="muted small-note">Collez le lien dans votre statut WhatsApp, sur Instagram, Facebook ou Google Maps.
+            Imprimez le QR code et posez-le sur les tables : les clients le scannent avec l'appareil photo de leur téléphone.</p>
+        </div>
+      </div>
+    </div>`;
+};
+
+function creerCommandeExterne(type, client) {
+  const jour = aujourdHui();
+  const numero = db.commandes.filter(c => modeDe(c) !== 'sur_place' && jourDe(c.ouverteLe) === jour).length + 1;
+  const c = { id: uid(), tableId: 'ext-' + uid(), type, client, lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString(),
+    tableNom: `${MODES[type].libelle} n° ${numero}${client.nom ? ' — ' + client.nom : ''}` };
+  db.commandes.push(c);
+  return c;
+}
+
+// Crée la commande à partir du code JG1 contenu dans le message WhatsApp du client
+function importerCommande(data) {
+  const lignes = (data.l || []).map(([id, ti, vi, qte]) => {
+    const plat = db.carte.find(p => p.id === id);
+    if (!plat) return null;
+    return { plat, taille: ti >= 0 ? taillesDe(plat)[ti] : null, variante: vi >= 0 ? variantesDe(plat)[vi] : null, qte: Number(qte) || 1 };
+  });
+  const manquants = lignes.filter(l => !l).length;
+  const client = { nom: data.n || '', tel: data.t || '', adresse: data.a || '' };
+  let c;
+  let mode = MODES[data.m] ? data.m : 'emporter';
+  if (mode === 'sur_place') {
+    const table = db.tables.find(t => t.nom.toLowerCase() === String(data.tb || '').trim().toLowerCase());
+    if (table) {
+      c = commandeOuverte(table.id);
+      if (!c) {
+        c = { id: uid(), tableId: table.id, tableNom: table.nom, lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString(), type: 'sur_place' };
+        db.commandes.push(c);
+      }
+    } else {
+      mode = 'emporter';
+      client.nom = `${client.nom ? client.nom + ' — ' : ''}table « ${data.tb || '?'} »`;
+    }
+  }
+  if (!c) c = creerCommandeExterne(mode, client);
+  if (mode === 'livraison' && Number(db.menuEnLigne.fraisLivraison) > 0) {
+    c.lignes.push({ platId: null, nom: 'Frais de livraison', prix: Number(db.menuEnLigne.fraisLivraison), supplement: 0, qte: 1 });
+  }
+  lignes.filter(Boolean).forEach(l => ajouterLigneA(c, l.plat, l.taille, l.variante, l.qte));
+  if (data.x) c.note = [c.note, data.x].filter(Boolean).join(' — ');
+  modeSalle = mode;
+  tableSelectionnee = c.tableId;
+  return manquants;
+}
+
+function imprimerQr() {
+  const w = window.open('', '_blank', 'width=600,height=800');
+  if (!w) return alert('Autorisez les fenêtres pop-up pour imprimer le QR code.');
+  w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>QR code — ${esc(db.restaurant.nom)}</title>
+    <style>body{font-family:Arial,sans-serif;text-align:center;padding:40px}h1{margin:0 0 8px}svg{width:320px;height:320px}
+    p{font-size:18px}.url{font-size:12px;color:#555;word-break:break-all}</style></head><body>
+    <h1>${esc(db.restaurant.nom)}</h1><p>📱 Scannez pour voir la carte et commander</p>
+    ${qrCodeSvg(urlMenuPublic())}<p class="url">${esc(urlMenuPublic())}</p>
+    <script>window.onload = () => window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+Object.assign(actions, {
+  'telecharger-menu': () => {
+    if (!db.menuEnLigne.whatsapp) return alert("Indiquez d'abord le numéro WhatsApp du restaurant dans les réglages.");
+    const blob = new Blob([JSON.stringify(construireMenuPublic(db), null, 1)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'menu.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  },
+  'copier-lien-menu': () => {
+    navigator.clipboard?.writeText(urlMenuPublic()).then(() => alert('Lien copié.'), () => prompt('Copiez le lien :', urlMenuPublic()));
+  },
+  'imprimer-qr': imprimerQr,
+  'importer-whatsapp': () => ouvrirModal('Importer une commande WhatsApp', `
+      <p class="muted">Dans WhatsApp, appuyez longuement sur le message de commande du client, choisissez <strong>Copier</strong>, puis collez-le ici.</p>
+      <label>Message du client<textarea name="message" rows="8" required placeholder="🧾 Nouvelle commande…"></textarea></label>`,
+    d => {
+      const data = decoderCommande(d.message);
+      if (!data) { alert('Ce message ne contient pas de code de commande (ligne commençant par « JG1: »). Vérifiez que tout le message a été copié.'); return false; }
+      const manquants = importerCommande(data);
+      if (manquants) alert(`${manquants} article(s) ne sont plus sur la carte et n'ont pas été ajoutés.`);
+      if (location.hash !== '#commandes') { garderSelection = true; location.hash = '#commandes'; }
+    }, 'Importer'),
+});
+
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'form-menu-en-ligne') return;
+  e.preventDefault();
+  const d = Object.fromEntries(new FormData(e.target));
+  db.menuEnLigne = {
+    whatsapp: d.whatsapp.replace(/\D/g, '').replace(/^00/, ''),
+    accueil: d.accueil.trim(),
+    fraisLivraison: Number(d.fraisLivraison) || 0,
+    modes: Object.fromEntries(Object.keys(MODES).map(k => [k, !!d['mode_' + k]])),
+  };
+  if (!Object.values(db.menuEnLigne.modes).some(Boolean)) db.menuEnLigne.modes.emporter = true;
+  sauver(); rendre();
+  alert('Réglages enregistrés. Pensez à republier le fichier menu.json.');
+});
+
+/* =========================================================
    Routage
    ========================================================= */
 
@@ -1888,5 +2068,11 @@ function rendre() {
   $$('#nav a').forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + v));
 }
 
-window.addEventListener('hashchange', () => { tableSelectionnee = null; rendre(); });
+// Changer de page ferme la commande en cours d'affichage, sauf juste après un import WhatsApp
+let garderSelection = false;
+window.addEventListener('hashchange', () => {
+  if (!garderSelection) tableSelectionnee = null;
+  garderSelection = false;
+  rendre();
+});
 rendre();

@@ -42,7 +42,7 @@ const DONNEES_DEMO = {
   achats: [],
   operations: [],
   factures: [],
-  menuEnLigne: { whatsapp: '', accueil: '', lienCourt: 'https://sl1nk.com/plh5i18', fraisLivraison: 0, modes: { sur_place: true, emporter: true, livraison: true } },
+  menuEnLigne: { whatsapp: '', accueil: '', lienCourt: '', fraisLivraison: 0, modes: { sur_place: true, emporter: true, livraison: true } },
   stock: [
     { id: 's1', nom: 'Farine', quantite: 10, unite: 'kg', seuil: 3 },
     { id: 's2', nom: 'Beurre', quantite: 2, unite: 'kg', seuil: 2 },
@@ -58,6 +58,8 @@ function migrer(data) {
   const d = { ...structuredClone(DONNEES_DEMO), ...data };
   d.restaurant = { ...structuredClone(DONNEES_DEMO.restaurant), ...d.restaurant };
   d.menuEnLigne = { ...structuredClone(DONNEES_DEMO.menuEnLigne), ...d.menuEnLigne };
+  // Ce raccourcisseur affiche une publicité avant la redirection : on revient au lien direct
+  if (/sl1nk\.com|encurtador/i.test(d.menuEnLigne.lienCourt || '')) d.menuEnLigne.lienCourt = '';
   return d;
 }
 
@@ -1917,8 +1919,9 @@ vues.menuenligne = () => {
           <label>Numéro WhatsApp du restaurant (format international, sans le +)
             <input name="whatsapp" inputmode="tel" placeholder="Ex. : 212612345678" value="${esc(cfg.whatsapp)}" required></label>
           <label>Lien court vers la carte (facultatif)
-            <input name="lienCourt" type="url" placeholder="Ex. : https://bit.ly/…" value="${esc(cfg.lienCourt)}"></label>
-          <p class="muted small-note">Il doit mener vers : ${esc(urlMenuPublic())}</p>
+            <input name="lienCourt" type="url" placeholder="Ex. : https://tinyurl.com/…" value="${esc(cfg.lienCourt)}"></label>
+          <p class="muted small-note">Il doit mener directement vers ${esc(urlMenuPublic())}, sans page de publicité
+            (TinyURL ou is.gd conviennent). Laissez vide pour utiliser l'adresse directe.</p>
           <label>Message d'accueil (facultatif)<input name="accueil" placeholder="Ex. : Ouvert tous les jours de 12 h à 23 h" value="${esc(cfg.accueil)}"></label>
           <p class="muted small-note">Modes proposés aux clients :</p>
           <div class="row" style="flex-wrap:wrap">

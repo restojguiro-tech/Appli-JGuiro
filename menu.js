@@ -166,6 +166,25 @@ function rendreChampsClient() {
   $('#champs-client').innerHTML = html;
 }
 
+// Le paiement se fait à table, au retrait ou à la livraison, sauf la carte en ligne
+const momentPaiement = mode => ({ sur_place: 'à table', emporter: 'au retrait', livraison: 'à la livraison' }[mode]);
+const paiementsMenu = () => (Array.isArray(menu.paiements) && menu.paiements.length ? menu.paiements : ['especes', 'tpe']);
+
+function libellePaiement(p, mode) {
+  return p === 'en_ligne' ? 'Carte bancaire en ligne (maintenant)' : `${MENU_PAIEMENTS[p]} ${momentPaiement(mode)}`;
+}
+
+function rendrePaiements() {
+  const mode = modeChoisi();
+  const actuel = $('input[name=paiement]:checked')?.value;
+  const liste = paiementsMenu();
+  const choisi = liste.includes(actuel) ? actuel : liste[0];
+  const icones = { especes: '💵', tpe: '💳', en_ligne: '🌐' };
+  $('#choix-paiement').innerHTML = liste.map(p => `
+    <label class="option"><input type="radio" name="paiement" value="${p}" ${p === choisi ? 'checked' : ''}>
+      <span>${icones[p]} ${esc(libellePaiement(p, mode))}</span></label>`).join('');
+}
+
 function rendrePanier() {
   const frais = modeChoisi() === 'livraison' ? menu.fraisLivraison : 0;
   $('#lignes-panier').innerHTML = panier.map((l, i) => `
@@ -184,6 +203,7 @@ function ouvrirPanier() {
   $('#choix-modes').innerHTML = menu.modes.map((m, i) => `
     <label><input type="radio" name="mode" value="${m}" ${i === 0 ? 'checked' : ''}><span>${MENU_MODES[m]}</span></label>`).join('');
   rendreChampsClient();
+  rendrePaiements();
   rendrePanier();
   $('#panier').showModal();
 }
@@ -199,6 +219,8 @@ function envoyer(e) {
   const mode = modeChoisi();
   const val = n => (f[n]?.value || '').trim();
   const frais = mode === 'livraison' ? menu.fraisLivraison : 0;
+  const paiement = $('input[name=paiement]:checked')?.value || paiementsMenu()[0];
+  const total = totalPanier() + frais;
   const lignes = panier.map(l => `• ${l.qte} × ${nomLigne(l)} = ${dh(prixLigne(l) * l.qte)}`);
   if (frais) lignes.push(`• Frais de livraison = ${dh(frais)}`);
   const message = [
@@ -211,20 +233,37 @@ function envoyer(e) {
     '',
     ...lignes,
     '',
-    `*Total : ${dh(totalPanier() + frais)}*`,
+    `*Total : ${dh(total)}*`,
+    `Paiement : *${libellePaiement(paiement, mode)}*`,
     val('note') ? `Remarque : ${val('note')}` : null,
     '',
     encoderCommande({
-      m: mode, tb: val('table'), n: val('nom'), t: val('tel'), a: val('adresse'), x: val('note'),
+      m: mode, tb: val('table'), n: val('nom'), t: val('tel'), a: val('adresse'), x: val('note'), p: paiement,
       l: panier.map(l => [l.id, l.ti, l.vi, l.qte]),
     }),
   ].filter(l => l !== null).join('\n');
 
-  window.location.href = `https://wa.me/${menu.whatsapp}?text=${encodeURIComponent(message)}`;
-  panier = [];
-  sauverPanier();
+  const lienWhatsApp = `https://wa.me/${menu.whatsapp}?text=${encodeURIComponent(message)}`;
+  const viderPanier = () => { panier = []; sauverPanier(); rendreCarte(); };
   $('#panier').close();
-  rendreCarte();
+
+  if (paiement !== 'en_ligne') {
+    window.location.href = lienWhatsApp;
+    viderPanier();
+    return;
+  }
+  // Carte en ligne : le client envoie la commande puis ouvre la page de paiement du restaurant
+  const montant = total.toFixed(2);
+  const lienPaiement = menu.lienPaiement.replace(/\{montant\}/g, montant);
+  $('#conf-total').textContent = dh(total);
+  $('#conf-whatsapp').href = lienWhatsApp;
+  $('#conf-payer').href = lienPaiement;
+  $('#conf-payer').textContent = `2. Payer ${dh(total)} par carte bancaire`;
+  $('#conf-aide').textContent = menu.lienPaiement.includes('{montant}')
+    ? 'Le montant est déjà indiqué sur la page de paiement sécurisée.'
+    : `Sur la page de paiement sécurisée, indiquez le montant de ${dh(total)} et votre nom.`;
+  $('#conf-whatsapp').onclick = viderPanier;
+  $('#confirmation').showModal();
 }
 
 /* ---------- Événements ---------- */
@@ -246,7 +285,8 @@ document.addEventListener('click', e => {
   if (e.target.closest('[data-fermer]')) $('#panier').close();
 });
 $('#barre-panier').addEventListener('click', ouvrirPanier);
-$('#choix-modes').addEventListener('change', () => { rendreChampsClient(); rendrePanier(); });
+$('#choix-modes').addEventListener('change', () => { rendreChampsClient(); rendrePaiements(); rendrePanier(); });
+document.addEventListener('click', e => { if (e.target.closest('[data-fermer-conf]')) $('#confirmation').close(); });
 $('#form-panier').addEventListener('submit', envoyer);
 
 // Catégorie active pendant le défilement

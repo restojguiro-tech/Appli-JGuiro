@@ -175,3 +175,7 @@ input, select, textarea {
 .option input { width: auto; margin: 0; flex: 0 0 auto; }
 .option span { color: var(--text); }
 .option span:last-of-type { white-space: nowrap; font-weight: 600; }
+
+.etapes-paiement { display: grid; gap: 10px; margin: 14px 0; }
+.etapes-paiement .btn { display: block; text-align: center; text-decoration: none; padding: 14px; font-weight: 700; }
+#choix-paiement .option span:first-of-type { flex: 1; }

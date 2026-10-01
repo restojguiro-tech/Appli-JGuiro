@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Notre carte — Commander</title>
   <meta name="theme-color" content="#2b2622">
-  <link rel="stylesheet" href="menu.css?v=2026-10-03">
+  <link rel="stylesheet" href="menu.css?v=2026-10-04">
 </head>
 <body>
   <header class="entete">
@@ -53,15 +53,31 @@
       </fieldset>
 
       <div id="champs-client"></div>
+      <fieldset>
+        <legend>Comment souhaitez-vous payer ?</legend>
+        <div id="choix-paiement" class="options-liste"></div>
+      </fieldset>
       <label>Remarque (allergies, cuisson, heure de retrait…)
         <textarea name="note" rows="2"></textarea>
       </label>
-      <p class="petit">Votre commande sera envoyée au restaurant par WhatsApp. Le paiement se fait au restaurant ou à la livraison.</p>
+      <p class="petit">Votre commande sera envoyée au restaurant par WhatsApp.</p>
       <button type="submit" class="btn whatsapp">Envoyer ma commande par WhatsApp</button>
     </form>
   </dialog>
 
-  <script src="menu-commun.js?v=2026-10-03"></script>
-  <script src="menu.js?v=2026-10-03"></script>
+  <!-- Paiement en ligne : envoi de la commande puis paiement -->
+  <dialog id="confirmation" class="feuille">
+    <h2>Dernière étape</h2>
+    <p>Total à payer : <strong id="conf-total"></strong></p>
+    <div class="etapes-paiement">
+      <a id="conf-whatsapp" class="btn whatsapp" target="_blank" rel="noopener">1. Envoyer ma commande sur WhatsApp</a>
+      <a id="conf-payer" class="btn primaire" target="_blank" rel="noopener">2. Payer par carte bancaire</a>
+    </div>
+    <p class="petit" id="conf-aide"></p>
+    <div class="actions"><button type="button" class="btn" data-fermer-conf>Terminé</button></div>
+  </dialog>
+
+  <script src="menu-commun.js?v=2026-10-04"></script>
+  <script src="menu.js?v=2026-10-04"></script>
 </body>
 </html>

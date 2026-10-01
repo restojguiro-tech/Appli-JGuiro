@@ -42,7 +42,7 @@ const DONNEES_DEMO = {
   achats: [],
   operations: [],
   factures: [],
-  menuEnLigne: { whatsapp: '', accueil: '', lienCourt: '', fraisLivraison: 0, modes: { sur_place: true, emporter: true, livraison: true } },
+  menuEnLigne: { whatsapp: '', accueil: '', lienCourt: '', fraisLivraison: 0, lienPaiement: '', paiements: { especes: true, tpe: true, en_ligne: false }, modes: { sur_place: true, emporter: true, livraison: true } },
   stock: [
     { id: 's1', nom: 'Farine', quantite: 10, unite: 'kg', seuil: 3 },
     { id: 's2', nom: 'Beurre', quantite: 2, unite: 'kg', seuil: 2 },
@@ -58,6 +58,7 @@ function migrer(data) {
   const d = { ...structuredClone(DONNEES_DEMO), ...data };
   d.restaurant = { ...structuredClone(DONNEES_DEMO.restaurant), ...d.restaurant };
   d.menuEnLigne = { ...structuredClone(DONNEES_DEMO.menuEnLigne), ...d.menuEnLigne };
+  d.menuEnLigne.paiements = { ...DONNEES_DEMO.menuEnLigne.paiements, ...d.menuEnLigne.paiements };
   // Ce raccourcisseur affiche une publicité avant la redirection : on revient au lien direct
   if (/sl1nk\.com|encurtador/i.test(d.menuEnLigne.lienCourt || '')) d.menuEnLigne.lienCourt = '';
   return d;
@@ -322,6 +323,8 @@ function vuePriseCommande(tableId) {
         <h2>Ticket</h2>
         ${c ? `<p class="muted">Ouvert à ${fmtHeure(c.ouverteLe)}</p>` : ''}
         ${c?.note ? `<p class="note-commande">📝 ${esc(c.note)}</p>` : ''}
+        ${c?.paiementPrevu ? `<p class="note-commande">${c.paiementPrevu === 'en_ligne' ? '🌐' : c.paiementPrevu === 'tpe' ? '💳' : '💵'}
+          Paiement prévu : <strong>${esc(MENU_PAIEMENTS[c.paiementPrevu])}</strong>${c.paiementPrevu === 'en_ligne' ? ' — vérifiez la réception du paiement' : ''}</p>` : ''}
         ${lignes.length ? lignes.map((l, i) => `
           <div class="ticket-line">
             <button class="btn qty-btn" data-action="moins" data-i="${i}">−</button>
@@ -798,10 +801,11 @@ const actions = {
 
   'encaisser': () => {
     const c = commandeOuverte(tableSelectionnee);
+    const prevu = { especes: 'Espèces', tpe: 'Carte bancaire', en_ligne: 'Carte bancaire en ligne' }[c.paiementPrevu] || 'Carte bancaire';
     ouvrirModal(`Encaisser ${dh(totalCommande(c))}`, `
       <label>Moyen de paiement
         <select name="paiement">
-          <option>Carte bancaire</option><option>Espèces</option><option>Ticket restaurant</option><option>Chèque</option>
+          ${optionsHtml(['Carte bancaire', 'Espèces', 'Carte bancaire en ligne', 'Ticket restaurant', 'Chèque'], prevu)}
         </select>
       </label>`,
     d => {
@@ -1929,6 +1933,16 @@ vues.menuenligne = () => {
               <label style="flex:0 0 auto"><input type="checkbox" name="mode_${k}" style="width:auto" ${cfg.modes[k] !== false ? 'checked' : ''}> ${m.icone} ${m.libelle}</label>`).join('')}
           </div>
           <label>Frais de livraison (DH)<input name="fraisLivraison" type="number" step="0.01" min="0" value="${esc(cfg.fraisLivraison || 0)}"></label>
+          <p class="muted small-note">Moyens de paiement proposés aux clients :</p>
+          <div class="row" style="flex-wrap:wrap">
+            <label style="flex:0 0 auto"><input type="checkbox" name="pay_especes" style="width:auto" ${cfg.paiements.especes !== false ? 'checked' : ''}> 💵 Espèces (à table, au retrait, à la livraison)</label>
+            <label style="flex:0 0 auto"><input type="checkbox" name="pay_tpe" style="width:auto" ${cfg.paiements.tpe !== false ? 'checked' : ''}> 💳 Carte bancaire sur terminal (TPE)</label>
+            <label style="flex:0 0 auto"><input type="checkbox" name="pay_en_ligne" style="width:auto" ${cfg.paiements.en_ligne ? 'checked' : ''}> 🌐 Carte bancaire en ligne</label>
+          </div>
+          <label>Lien de paiement en ligne (fourni par votre banque ou votre prestataire de paiement)
+            <input name="lienPaiement" type="url" placeholder="https://…" value="${esc(cfg.lienPaiement)}"></label>
+          <p class="muted small-note">Nécessaire pour la carte en ligne. Si votre prestataire accepte le montant dans l'adresse, écrivez
+            <code>{montant}</code> à cet endroit : il sera remplacé par le total de la commande.</p>
           <button class="btn primary" type="submit">Enregistrer</button>
         </form>
       </div>
@@ -2003,6 +2017,7 @@ function importerCommande(data) {
   }
   lignes.filter(Boolean).forEach(l => ajouterLigneA(c, l.plat, l.taille, l.variante, l.qte));
   if (data.x) c.note = [c.note, data.x].filter(Boolean).join(' — ');
+  if (MENU_PAIEMENTS[data.p]) c.paiementPrevu = data.p;
   modeSalle = mode;
   tableSelectionnee = c.tableId;
   return manquants;
@@ -2055,9 +2070,15 @@ document.addEventListener('submit', e => {
     accueil: d.accueil.trim(),
     lienCourt: d.lienCourt.trim(),
     fraisLivraison: Number(d.fraisLivraison) || 0,
+    lienPaiement: d.lienPaiement.trim(),
+    paiements: { especes: !!d.pay_especes, tpe: !!d.pay_tpe, en_ligne: !!d.pay_en_ligne },
     modes: Object.fromEntries(Object.keys(MODES).map(k => [k, !!d['mode_' + k]])),
   };
   if (!Object.values(db.menuEnLigne.modes).some(Boolean)) db.menuEnLigne.modes.emporter = true;
+  if (db.menuEnLigne.paiements.en_ligne && !db.menuEnLigne.lienPaiement) {
+    alert("La carte en ligne ne sera pas proposée tant qu'aucun lien de paiement n'est indiqué.");
+  }
+  if (!paiementsActifs(db.menuEnLigne).length) db.menuEnLigne.paiements.especes = true;
   sauver(); rendre();
   alert('Réglages enregistrés. Pensez à republier le fichier menu.json.');
 });

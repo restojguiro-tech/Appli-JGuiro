@@ -11,6 +11,14 @@ const MENU_MODES = {
   emporter: 'À emporter',
   livraison: 'Livraison',
 };
+const MENU_PAIEMENTS = {
+  especes: 'Espèces',
+  tpe: 'Carte bancaire (terminal)',
+  en_ligne: 'Carte bancaire en ligne',
+};
+// Moyens de paiement proposés aux clients (espèces et carte sur terminal par défaut)
+const paiementsActifs = cfg => Object.keys(MENU_PAIEMENTS)
+  .filter(p => (p === 'en_ligne' ? cfg?.paiements?.en_ligne === true && !!cfg?.lienPaiement : cfg?.paiements?.[p] !== false));
 
 // Construit la carte publique (sans prix d'achat, stock, ventes…) à partir des données du restaurant.
 function construireMenuPublic(d) {
@@ -24,6 +32,8 @@ function construireMenuPublic(d) {
     accueil: cfg.accueil || '',
     modes: Object.keys(MENU_MODES).filter(m => cfg.modes?.[m] !== false),
     fraisLivraison: Number(cfg.fraisLivraison) || 0,
+    paiements: paiementsActifs(cfg),
+    lienPaiement: cfg.lienPaiement || '',
     tables: (d.tables || []).map(t => t.nom),
     categories: [...new Set(plats.map(p => p.categorie))],
     plats: plats.map(p => ({

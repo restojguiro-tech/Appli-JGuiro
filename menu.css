@@ -172,3 +172,6 @@ input, select, textarea {
 .petit { font-size: .8rem; color: var(--muted); }
 .vide { text-align: center; color: var(--muted); padding: 40px 16px; }
 .barre-panier[hidden] { display: none; }
+.option input { width: auto; margin: 0; flex: 0 0 auto; }
+.option span { color: var(--text); }
+.option span:last-of-type { white-space: nowrap; font-weight: 600; }

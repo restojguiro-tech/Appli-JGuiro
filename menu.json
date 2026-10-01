@@ -1,0 +1,1979 @@
+{
+ "format": 1,
+ "genereLe": "2026-10-01T17:23:35.496Z",
+ "restaurant": {
+  "nom": "Restaurant JGuiro",
+  "adresse": "Résidence Shaherazade, 5 Boulevard abdelmoumen, Rue Soumaya, Casablanca 20250",
+  "telephone": "0629493027"
+ },
+ "whatsapp": "212775750223",
+ "accueil": "Bonjour et bienvenue chez JGuiro, nous sommes ouverts du lundi au dimanche de 12h à 23h",
+ "modes": [
+  "sur_place",
+  "emporter",
+  "livraison"
+ ],
+ "fraisLivraison": 0,
+ "tables": [
+  "Table 1",
+  "Table 2",
+  "Table 3",
+  "Table 4",
+  "Table 5",
+  "Terrasse 1"
+ ],
+ "categories": [
+  "Suppléments",
+  "Plats",
+  "Boissons"
+ ],
+ "plats": [
+  {
+   "id": "p1",
+   "nom": "Attiéké",
+   "categorie": "Suppléments",
+   "prix": 20,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "p2",
+   "nom": "Frites de pomme de terre",
+   "categorie": "Suppléments",
+   "prix": 15,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "p3",
+   "nom": "Thon",
+   "categorie": "Plats",
+   "prix": 40,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Claclo",
+     "supplement": 10
+    },
+    {
+     "nom": "Alloco",
+     "supplement": 25
+    },
+    {
+     "nom": "Igname",
+     "supplement": 25
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "p4",
+   "nom": "Abadèche avec attiéké, frites ou riz",
+   "categorie": "Plats",
+   "prix": 70,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 70
+    },
+    {
+     "nom": "",
+     "prix": 80
+    },
+    {
+     "nom": "",
+     "prix": 90
+    },
+    {
+     "nom": "",
+     "prix": 100
+    },
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "p5",
+   "nom": "Daurade avec attiéké, frites ou riz",
+   "categorie": "Plats",
+   "prix": 100,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 100
+    },
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    },
+    {
+     "nom": "",
+     "prix": 160
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "p8",
+   "nom": "Coca-cola",
+   "categorie": "Boissons",
+   "prix": 9,
+   "tailles": [
+    {
+     "nom": "0.5l",
+     "prix": 9
+    },
+    {
+     "nom": "1l",
+     "prix": 18
+    }
+   ],
+   "variantes": []
+  },
+  {
+   "id": "p9",
+   "nom": "Sprite",
+   "categorie": "Boissons",
+   "prix": 9,
+   "tailles": [
+    {
+     "nom": "0.5l",
+     "prix": 9
+    },
+    {
+     "nom": "1l",
+     "prix": 18
+    }
+   ],
+   "variantes": []
+  },
+  {
+   "id": "p10",
+   "nom": "Eau minérale",
+   "categorie": "Boissons",
+   "prix": 5,
+   "tailles": [
+    {
+     "nom": "0.5l",
+     "prix": 5
+    },
+    {
+     "nom": "1.5l",
+     "prix": 10
+    }
+   ],
+   "variantes": []
+  },
+  {
+   "id": "muk6omfhqi2br",
+   "nom": "Abadèche avec Claclo",
+   "categorie": "Plats",
+   "prix": 80,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 80
+    },
+    {
+     "nom": "",
+     "prix": 90
+    },
+    {
+     "nom": "",
+     "prix": 100
+    },
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    },
+    {
+     "nom": "",
+     "prix": 160
+    }
+   ],
+   "variantes": []
+  },
+  {
+   "id": "muk6qgrme6b7a",
+   "nom": "Abadèche avec alloco ou igname",
+   "categorie": "Plats",
+   "prix": 105,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 105
+    },
+    {
+     "nom": "",
+     "prix": 115
+    },
+    {
+     "nom": "",
+     "prix": 125
+    },
+    {
+     "nom": "",
+     "prix": 135
+    },
+    {
+     "nom": "",
+     "prix": 145
+    },
+    {
+     "nom": "",
+     "prix": 155
+    },
+    {
+     "nom": "",
+     "prix": 165
+    },
+    {
+     "nom": "",
+     "prix": 175
+    },
+    {
+     "nom": "",
+     "prix": 185
+    },
+    {
+     "nom": "",
+     "prix": 195
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Alloco",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname",
+     "supplement": 0
+    },
+    {
+     "nom": "Banane bouillie",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname bouillie",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk7ws1cvoski",
+   "nom": "Daurade avec Claclo",
+   "categorie": "Plats",
+   "prix": 110,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    },
+    {
+     "nom": "",
+     "prix": 160
+    },
+    {
+     "nom": "",
+     "prix": 170
+    }
+   ],
+   "variantes": []
+  },
+  {
+   "id": "muk7zljgf9lms",
+   "nom": "Daurade avec alloco ou igname",
+   "categorie": "Plats",
+   "prix": 135,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 135
+    },
+    {
+     "nom": "",
+     "prix": 145
+    },
+    {
+     "nom": "",
+     "prix": 155
+    },
+    {
+     "nom": "",
+     "prix": 165
+    },
+    {
+     "nom": "",
+     "prix": 175
+    },
+    {
+     "nom": "",
+     "prix": 185
+    },
+    {
+     "nom": "",
+     "prix": 195
+    },
+    {
+     "nom": "",
+     "prix": 205
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Alloco",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname",
+     "supplement": 0
+    },
+    {
+     "nom": "Banane bouillie",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname bouillie",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk840c1bc9ku",
+   "nom": "Tilapia avec attiéké, frites ou riz",
+   "categorie": "Plats",
+   "prix": 100,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 100
+    },
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    },
+    {
+     "nom": "",
+     "prix": 160
+    },
+    {
+     "nom": "",
+     "prix": 170
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk87644yejx2",
+   "nom": "Tilapia avec Claclo",
+   "categorie": "Plats",
+   "prix": 110,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    },
+    {
+     "nom": "",
+     "prix": 160
+    },
+    {
+     "nom": "",
+     "prix": 170
+    }
+   ],
+   "variantes": []
+  },
+  {
+   "id": "muk88x3rdy2gd",
+   "nom": "Tilapia avec Alloco ou igname",
+   "categorie": "Plats",
+   "prix": 135,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 135
+    },
+    {
+     "nom": "",
+     "prix": 145
+    },
+    {
+     "nom": "",
+     "prix": 155
+    },
+    {
+     "nom": "",
+     "prix": 165
+    },
+    {
+     "nom": "",
+     "prix": 175
+    },
+    {
+     "nom": "",
+     "prix": 185
+    },
+    {
+     "nom": "",
+     "prix": 195
+    },
+    {
+     "nom": "",
+     "prix": 205
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Alloco",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname",
+     "supplement": 0
+    },
+    {
+     "nom": "Banane bouillie",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname bouillie",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk8i5wfhg68c",
+   "nom": "Sole avec attiéké, frites ou riz",
+   "categorie": "Plats",
+   "prix": 100,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 100
+    },
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    },
+    {
+     "nom": "",
+     "prix": 160
+    },
+    {
+     "nom": "",
+     "prix": 170
+    },
+    {
+     "nom": "",
+     "prix": 180
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk8jni1qtwc1",
+   "nom": "Sole avec Claclo",
+   "categorie": "Plats",
+   "prix": 110,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    },
+    {
+     "nom": "",
+     "prix": 160
+    },
+    {
+     "nom": "",
+     "prix": 170
+    },
+    {
+     "nom": "",
+     "prix": 180
+    }
+   ],
+   "variantes": []
+  },
+  {
+   "id": "muk8ldve6lon2",
+   "nom": "Sole avec Alloco ou igname",
+   "categorie": "Plats",
+   "prix": 135,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 135
+    },
+    {
+     "nom": "",
+     "prix": 145
+    },
+    {
+     "nom": "",
+     "prix": 155
+    },
+    {
+     "nom": "",
+     "prix": 165
+    },
+    {
+     "nom": "",
+     "prix": 175
+    },
+    {
+     "nom": "",
+     "prix": 185
+    },
+    {
+     "nom": "",
+     "prix": 195
+    },
+    {
+     "nom": "",
+     "prix": 205
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Alloco",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname",
+     "supplement": 0
+    },
+    {
+     "nom": "Banane bouillie",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname bouillie",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk8qmwwb54q5",
+   "nom": "Sosso avec attiéké, frites ou riz",
+   "categorie": "Plats",
+   "prix": 100,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 100
+    },
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    },
+    {
+     "nom": "",
+     "prix": 160
+    },
+    {
+     "nom": "",
+     "prix": 170
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk8x7foje5j4",
+   "nom": "Sosso avec Claclo",
+   "categorie": "Plats",
+   "prix": 110,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    },
+    {
+     "nom": "",
+     "prix": 160
+    },
+    {
+     "nom": "",
+     "prix": 170
+    },
+    {
+     "nom": "",
+     "prix": 180
+    }
+   ],
+   "variantes": []
+  },
+  {
+   "id": "muk8z75qg2gw4",
+   "nom": "Sosso avec Alloco ou igname",
+   "categorie": "Plats",
+   "prix": 135,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 135
+    },
+    {
+     "nom": "",
+     "prix": 145
+    },
+    {
+     "nom": "",
+     "prix": 155
+    },
+    {
+     "nom": "",
+     "prix": 165
+    },
+    {
+     "nom": "",
+     "prix": 175
+    },
+    {
+     "nom": "",
+     "prix": 185
+    },
+    {
+     "nom": "",
+     "prix": 195
+    },
+    {
+     "nom": "",
+     "prix": 205
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Alloco",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname",
+     "supplement": 0
+    },
+    {
+     "nom": "Banane bouillie",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname bouillie",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk9cw7tx9gth",
+   "nom": "Merlan avec attiéké, frites ou riz",
+   "categorie": "Plats",
+   "prix": 50,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 50
+    },
+    {
+     "nom": "",
+     "prix": 60
+    },
+    {
+     "nom": "",
+     "prix": 70
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk9f5ma85pgu",
+   "nom": "Merlan avec Claclo",
+   "categorie": "Plats",
+   "prix": 60,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 60
+    },
+    {
+     "nom": "",
+     "prix": 70
+    },
+    {
+     "nom": "",
+     "prix": 80
+    }
+   ],
+   "variantes": []
+  },
+  {
+   "id": "muk9h33090e2k",
+   "nom": "Merlan avec alloco ou igname",
+   "categorie": "Plats",
+   "prix": 85,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 85
+    },
+    {
+     "nom": "",
+     "prix": 95
+    },
+    {
+     "nom": "",
+     "prix": 105
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Alloco",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname",
+     "supplement": 0
+    },
+    {
+     "nom": "Banane bouillie",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname bouillie",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk9lcgfvea8o",
+   "nom": "Carpe rouge avec attiéké, frites ou riz",
+   "categorie": "Plats",
+   "prix": 90,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 90
+    },
+    {
+     "nom": "",
+     "prix": 100
+    },
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    },
+    {
+     "nom": "",
+     "prix": 160
+    },
+    {
+     "nom": "",
+     "prix": 170
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk9nhqwjqeov",
+   "nom": "Carpe rouge avec Claclo",
+   "categorie": "Plats",
+   "prix": 100,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 100
+    },
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 130
+    },
+    {
+     "nom": "",
+     "prix": 140
+    },
+    {
+     "nom": "",
+     "prix": 150
+    },
+    {
+     "nom": "",
+     "prix": 160
+    }
+   ],
+   "variantes": []
+  },
+  {
+   "id": "muk9pnde71ktq",
+   "nom": "Carpe rouge avec alloco ou igname",
+   "categorie": "Plats",
+   "prix": 125,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 125
+    },
+    {
+     "nom": "",
+     "prix": 135
+    },
+    {
+     "nom": "",
+     "prix": 145
+    },
+    {
+     "nom": "",
+     "prix": 155
+    },
+    {
+     "nom": "",
+     "prix": 165
+    },
+    {
+     "nom": "",
+     "prix": 175
+    },
+    {
+     "nom": "",
+     "prix": 185
+    },
+    {
+     "nom": "",
+     "prix": 195
+    },
+    {
+     "nom": "",
+     "prix": 205
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Alloco",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname",
+     "supplement": 0
+    },
+    {
+     "nom": "Banane bouillie",
+     "supplement": 0
+    },
+    {
+     "nom": "Igname bouillie",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "muk9s3iyvley7",
+   "nom": "Pavé de saumon avec légume sauté",
+   "categorie": "Plats",
+   "prix": 130,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muk9vaoli4ixj",
+   "nom": "Riz basmati",
+   "categorie": "Suppléments",
+   "prix": 20,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muk9w5ysisk3t",
+   "nom": "Riz de tchep",
+   "categorie": "Suppléments",
+   "prix": 25,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muk9x3qddo4el",
+   "nom": "Claclo",
+   "categorie": "Suppléments",
+   "prix": 25,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muk9xwzjjujl0",
+   "nom": "Placali",
+   "categorie": "Suppléments",
+   "prix": 25,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muk9yjp3c2lyu",
+   "nom": "Alloco",
+   "categorie": "Suppléments",
+   "prix": 50,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muk9z41j120i9",
+   "nom": "Frites de patate douce",
+   "categorie": "Suppléments",
+   "prix": 25,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muk9zqcfst5xh",
+   "nom": "Banane bouillie",
+   "categorie": "Suppléments",
+   "prix": 50,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muka0jhkyjlyh",
+   "nom": "Igname bouillie",
+   "categorie": "Suppléments",
+   "prix": 50,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muka23j5apl36",
+   "nom": "Oeufs",
+   "categorie": "Suppléments",
+   "prix": 2.5,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muka42jtft7f7",
+   "nom": "Cube maggi",
+   "categorie": "Suppléments",
+   "prix": 2.5,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muka4tcaa8q0m",
+   "nom": "Légume sauté",
+   "categorie": "Suppléments",
+   "prix": 20,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muka5rt69lzi1",
+   "nom": "Piment frais",
+   "categorie": "Suppléments",
+   "prix": 5,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muka63eb784r1",
+   "nom": "Piment pâte",
+   "categorie": "Suppléments",
+   "prix": 5,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "muka74kjzs3ci",
+   "nom": "Mayonnaise",
+   "categorie": "Suppléments",
+   "prix": 5,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "mukbjhldtvgai",
+   "nom": "Condiments",
+   "categorie": "Suppléments",
+   "prix": 5,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "mukbkpa1qqz0u",
+   "nom": "Croquette de pomme de terre",
+   "categorie": "Suppléments",
+   "prix": 25,
+   "tailles": [],
+   "variantes": []
+  },
+  {
+   "id": "mukbrtnxehrxl",
+   "nom": "Ailes de poulets",
+   "categorie": "Plats",
+   "prix": 35,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Claclo",
+     "supplement": 10
+    },
+    {
+     "nom": "Alloco",
+     "supplement": 35
+    }
+   ]
+  },
+  {
+   "id": "mukbwdr2uukpb",
+   "nom": "Poulet (frit, sauté et Choukouya)",
+   "categorie": "Plats",
+   "prix": 55,
+   "tailles": [
+    {
+     "nom": "1/4",
+     "prix": 55
+    },
+    {
+     "nom": "1/2",
+     "prix": 110
+    },
+    {
+     "nom": "1 poulet entier",
+     "prix": 220
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Claclo",
+     "supplement": 10
+    },
+    {
+     "nom": "Alloco",
+     "supplement": 35
+    }
+   ]
+  },
+  {
+   "id": "mukc594qedksv",
+   "nom": "Poulet mayonnaise",
+   "categorie": "Plats",
+   "prix": 60,
+   "tailles": [
+    {
+     "nom": "1/4",
+     "prix": 60
+    },
+    {
+     "nom": "1/2",
+     "prix": 120
+    },
+    {
+     "nom": "1 poulet entier",
+     "prix": 240
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Claclo",
+     "supplement": 10
+    },
+    {
+     "nom": "Alloco",
+     "supplement": 35
+    }
+   ]
+  },
+  {
+   "id": "mukc8xj7sdx3d",
+   "nom": "Kédjénou de poulet",
+   "categorie": "Plats",
+   "prix": 60,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "mukcaz6lce36w",
+   "nom": "Soupe de poisson",
+   "categorie": "Plats",
+   "prix": 70,
+   "tailles": [
+    {
+     "nom": "",
+     "prix": 90
+    },
+    {
+     "nom": "",
+     "prix": 100
+    },
+    {
+     "nom": "",
+     "prix": 110
+    },
+    {
+     "nom": "",
+     "prix": 120
+    },
+    {
+     "nom": "",
+     "prix": 70
+    },
+    {
+     "nom": "",
+     "prix": 80
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "mukcex5obobu6",
+   "nom": "Sauce arachide poulet",
+   "categorie": "Plats",
+   "prix": 80,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Foutou banane",
+     "supplement": 45
+    },
+    {
+     "nom": "Foutou igname",
+     "supplement": 45
+    }
+   ]
+  },
+  {
+   "id": "mukch3s5qhqbx",
+   "nom": "Sauce arachide mouton",
+   "categorie": "Plats",
+   "prix": 90,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Foutou banane",
+     "supplement": 35
+    },
+    {
+     "nom": "Foutou igname",
+     "supplement": 35
+    },
+    {
+     "nom": "Placali",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "mukcixembxdf9",
+   "nom": "Sauce arachide boeuf",
+   "categorie": "Plats",
+   "prix": 115,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Foutou banane",
+     "supplement": 35
+    },
+    {
+     "nom": "Foutou igname",
+     "supplement": 35
+    }
+   ]
+  },
+  {
+   "id": "mukioc2tsg4hz",
+   "nom": "Gombo sec au poulet",
+   "categorie": "Plats",
+   "prix": 80,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Placali",
+     "supplement": 0
+    },
+    {
+     "nom": "Foutou banane",
+     "supplement": 45
+    },
+    {
+     "nom": "Foutou igname",
+     "supplement": 45
+    }
+   ]
+  },
+  {
+   "id": "mukircecla7ku",
+   "nom": "Gombo sec mouton",
+   "categorie": "Plats",
+   "prix": 90,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Placali",
+     "supplement": 0
+    },
+    {
+     "nom": "Foutou banane",
+     "supplement": 35
+    },
+    {
+     "nom": "Foutou igname",
+     "supplement": 35
+    }
+   ]
+  },
+  {
+   "id": "mukiv0dg2yea8",
+   "nom": "Gombo sec boeuf",
+   "categorie": "Plats",
+   "prix": 115,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Placali",
+     "supplement": 0
+    },
+    {
+     "nom": "Foutou banane",
+     "supplement": 35
+    },
+    {
+     "nom": "Foutou igname",
+     "supplement": 35
+    }
+   ]
+  },
+  {
+   "id": "mukiys2s4q579",
+   "nom": "Sauce graine poulet",
+   "categorie": "Plats",
+   "prix": 80,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Placali",
+     "supplement": 0
+    },
+    {
+     "nom": "Foutou banane",
+     "supplement": 45
+    },
+    {
+     "nom": "Foutou igname",
+     "supplement": 45
+    }
+   ]
+  },
+  {
+   "id": "mukj1ulowuquv",
+   "nom": "Sauce graine au boeuf",
+   "categorie": "Plats",
+   "prix": 115,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Placali",
+     "supplement": 0
+    },
+    {
+     "nom": "Foutou banane",
+     "supplement": 35
+    },
+    {
+     "nom": "Foutou igname",
+     "supplement": 35
+    }
+   ]
+  },
+  {
+   "id": "mukj4kbozuibq",
+   "nom": "Sauce graine mouton",
+   "categorie": "Plats",
+   "prix": 90,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Placali",
+     "supplement": 0
+    },
+    {
+     "nom": "Foutou banane",
+     "supplement": 35
+    },
+    {
+     "nom": "Foutou igname",
+     "supplement": 35
+    }
+   ]
+  },
+  {
+   "id": "mukj6dlw04qvo",
+   "nom": "Sauce légume au poulet",
+   "categorie": "Plats",
+   "prix": 80,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "mukj82as6qnl4",
+   "nom": "Sauce légume au mouton",
+   "categorie": "Plats",
+   "prix": 90,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "mukjad9vm197w",
+   "nom": "Sauce légume au boeuf",
+   "categorie": "Plats",
+   "prix": 115,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "mukjgtybcmy4h",
+   "nom": "Sauce feuille au poulet",
+   "categorie": "Plats",
+   "prix": 80,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Placali",
+     "supplement": 0
+    }
+   ]
+  },
+  {
+   "id": "mukjrysbieaa9",
+   "nom": "Tchep",
+   "categorie": "Plats",
+   "prix": 60,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Poisson",
+     "supplement": 0
+    },
+    {
+     "nom": "Poulet",
+     "supplement": 20
+    },
+    {
+     "nom": "Mouton",
+     "supplement": 30
+    },
+    {
+     "nom": "Boeuf",
+     "supplement": 55
+    }
+   ]
+  },
+  {
+   "id": "mukkjmcqn73up",
+   "nom": "Bœuf (Choukouya, sauté et mayonnaise)",
+   "categorie": "Plats",
+   "prix": 115,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Claclo",
+     "supplement": 10
+    },
+    {
+     "nom": "Alloco",
+     "supplement": 35
+    },
+    {
+     "nom": "Igname",
+     "supplement": 35
+    }
+   ]
+  },
+  {
+   "id": "mukkp2y9xfgjd",
+   "nom": "Mouton (Choukouya, Sauté, Mayonnaise)",
+   "categorie": "Plats",
+   "prix": 90,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Claclo",
+     "supplement": 10
+    },
+    {
+     "nom": "Alloco",
+     "supplement": 35
+    },
+    {
+     "nom": "Igname",
+     "supplement": 35
+    }
+   ]
+  },
+  {
+   "id": "mukkysr5a5kj8",
+   "nom": "Yassa",
+   "categorie": "Plats",
+   "prix": 60,
+   "tailles": [
+    {
+     "nom": "Poisson / poulet",
+     "prix": 60
+    },
+    {
+     "nom": "Mouton",
+     "prix": 90
+    },
+    {
+     "nom": "Bœuf",
+     "prix": 115
+    }
+   ],
+   "variantes": [
+    {
+     "nom": "Attiéké",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de pomme de terre",
+     "supplement": 0
+    },
+    {
+     "nom": "Frites de patate douce",
+     "supplement": 0
+    },
+    {
+     "nom": "Riz basmati",
+     "supplement": 0
+    },
+    {
+     "nom": "Claclo",
+     "supplement": 10
+    },
+    {
+     "nom": "Alloco",
+     "supplement": 35
+    }
+   ]
+  },
+  {
+   "id": "mulfsgvmx1z8o",
+   "nom": "Hawai",
+   "categorie": "Boissons",
+   "prix": 9,
+   "tailles": [
+    {
+     "nom": "0.5l",
+     "prix": 9
+    },
+    {
+     "nom": "1l",
+     "prix": 18
+    }
+   ],
+   "variantes": []
+  },
+  {
+   "id": "mulftumyg1tj1",
+   "nom": "Jus naturels",
+   "categorie": "Boissons",
+   "prix": 15,
+   "tailles": [],
+   "variantes": [
+    {
+     "nom": "Bissap",
+     "supplement": 0
+    },
+    {
+     "nom": "Gingembre",
+     "supplement": 0
+    },
+    {
+     "nom": "Citron",
+     "supplement": 0
+    },
+    {
+     "nom": "Orange",
+     "supplement": 0
+    }
+   ]
+  }
+ ]
+}

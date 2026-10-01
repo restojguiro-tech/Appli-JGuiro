@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Récupération des données — JGuiro</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f6f4f0; color: #2b2622; margin: 0; padding: 24px 16px; }
+    main { max-width: 640px; margin: 0 auto; background: #fff; border: 1px solid #e4ded6; border-radius: 12px; padding: 20px; }
+    h1 { font-size: 1.4rem; margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    td { padding: 6px 4px; border-bottom: 1px solid #e4ded6; }
+    td:last-child { text-align: right; font-weight: 600; }
+    .btn { display: inline-block; font: inherit; font-weight: 700; border: none; border-radius: 10px; padding: 14px 18px; background: #2f7d4f; color: #fff; cursor: pointer; }
+    .alerte { background: #fdf3e1; border-radius: 8px; padding: 10px 12px; }
+    .ok { background: #dcefe3; border-radius: 8px; padding: 10px 12px; }
+    .muted { color: #7a716a; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <main id="contenu"><p>Recherche des données…</p></main>
+  <script>
+    // Page de lecture seule : elle ne modifie rien, elle permet seulement de télécharger les données trouvées dans ce navigateur.
+    const fmt = n => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0) + ' DH';
+    const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const zone = document.getElementById('contenu');
+    let brut = null;
+    try { brut = localStorage.getItem('jguiro-restaurant-v1'); } catch (e) { /* accès refusé */ }
+    let copies = [];
+    try { copies = JSON.parse(localStorage.getItem('jguiro-copies-securite') || '[]'); } catch (e) { /* ignoré */ }
+
+    function resume(d) {
+      const payees = (d.commandes || []).filter(c => c.statut === 'payee');
+      const total = payees.reduce((s, c) => s + (c.lignes || []).reduce((t, l) => t + l.prix * l.qte, 0), 0);
+      const dates = payees.map(c => c.payeeLe).filter(Boolean).sort();
+      const achats = (d.achats || []).reduce((s, a) => s + (a.lignes || []).reduce((t, l) => t + l.quantite * l.pu, 0), 0);
+      return `<table>
+        <tr><td>Plats sur la carte</td><td>${(d.carte || []).length}</td></tr>
+        <tr><td>Ventes encaissées</td><td>${payees.length} tickets · ${fmt(total)}</td></tr>
+        <tr><td>Période des ventes</td><td>${dates.length ? `${new Date(dates[0]).toLocaleDateString('fr-FR')} → ${new Date(dates[dates.length - 1]).toLocaleDateString('fr-FR')}` : '—'}</td></tr>
+        <tr><td>Achats</td><td>${(d.achats || []).length} factures · ${fmt(achats)}</td></tr>
+        <tr><td>Factures clients</td><td>${(d.factures || []).length}</td></tr>
+        <tr><td>Dépenses / recettes saisies</td><td>${(d.operations || []).length}</td></tr>
+        <tr><td>Réservations</td><td>${(d.reservations || []).length}</td></tr>
+        <tr><td>Produits en stock</td><td>${(d.stock || []).length}</td></tr>
+      </table>`;
+    }
+
+    function telecharger(json, suffixe) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+      a.download = `sauvegarde-restaurant-${suffixe}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+    }
+
+    if (!brut && !copies.length) {
+      zone.innerHTML = `<h1>Aucune donnée trouvée dans ce navigateur</h1>
+        <p class="alerte">Ce navigateur ne contient pas de données de l'application à cette adresse.</p>
+        <p>Essayez sur l'ordinateur et avec le navigateur (Chrome, Edge…) que vous utilisiez avant le passage à jguiro.com.</p>`;
+    } else {
+      let html = '<h1>Données trouvées dans ce navigateur</h1>';
+      try {
+        if (brut) html += `<h2>Données de l'application</h2>${resume(JSON.parse(brut))}
+          <p><button class="btn" id="dl">⬇️ Télécharger la sauvegarde</button></p>`;
+      } catch (e) { html += '<p class="alerte">Les données sont présentes mais illisibles.</p>'; }
+      copies.forEach((c, i) => {
+        html += `<h2>Copie de sécurité du ${new Date(c.date).toLocaleString('fr-FR')} (${esc(c.raison)})</h2>${resume(c.donnees)}
+          <p><button class="btn" data-copie="${i}">⬇️ Télécharger cette copie</button></p>`;
+      });
+      html += `<p class="ok">Ensuite : ouvrez <strong>jguiro.com/gestion/</strong> → <strong>Paramètres</strong> → <strong>⬆️ Importer</strong>
+        et choisissez le fichier téléchargé.</p>
+        <p class="muted">Cette page ne modifie rien : vos données restent intactes dans ce navigateur.</p>`;
+      zone.innerHTML = html;
+      document.getElementById('dl')?.addEventListener('click', () => telecharger(brut, 'recuperee'));
+      document.querySelectorAll('[data-copie]').forEach(b => b.addEventListener('click', () =>
+        telecharger(JSON.stringify(copies[b.dataset.copie].donnees), 'copie-securite')));
+    }
+  </script>
+</body>
+</html>

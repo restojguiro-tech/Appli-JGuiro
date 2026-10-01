@@ -233,6 +233,7 @@ function ecouter() {
 
 async function demarrer() {
   majEtat({ statut: 'connexion' });
+  app.copieSecurite('avant synchronisation');
   let distant;
   try {
     const snap = await getDocs(elements);

@@ -82,6 +82,21 @@ function ecrireLocal() {
   }
 }
 
+// Copies de sécurité locales, faites avant toute opération qui remplace des données (2 dernières gardées)
+const CLE_COPIES = 'jguiro-copies-securite';
+function copiesSecurite() {
+  try { return JSON.parse(localStorage.getItem(CLE_COPIES) || '[]'); } catch (e) { return []; }
+}
+function copieSecurite(raison) {
+  try {
+    const json = JSON.stringify(db);
+    const copies = copiesSecurite();
+    if (copies[0] && JSON.stringify(copies[0].donnees) === json) return;
+    copies.unshift({ date: new Date().toISOString(), raison, donnees: JSON.parse(json) });
+    localStorage.setItem(CLE_COPIES, JSON.stringify(copies.slice(0, 2)));
+  } catch (e) { /* stockage plein : on ne bloque pas l'opération */ }
+}
+
 // Enregistre sur cet appareil puis envoie les changements aux autres appareils (si la synchronisation est active)
 function sauver() {
   ecrireLocal();
@@ -736,6 +751,10 @@ vues.parametres = () => `
           <input type="file" accept="application/json" data-action="importer" hidden>
         </label>
       </div>
+      ${copiesSecurite().length ? `<p class="muted small-note" style="margin-top:16px">Copies de sécurité automatiques sur cet appareil :</p>
+        ${copiesSecurite().map((c, i) => `<p style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span>${new Date(c.date).toLocaleString('fr-FR')} — ${esc(c.raison)} (${(c.donnees.commandes || []).length} commandes, ${(c.donnees.carte || []).length} plats)</span>
+          <button class="btn small" data-action="restaurer-copie" data-i="${i}">Restaurer</button></p>`).join('')}` : ''}
       <p style="margin-top:20px"><button class="btn danger" data-action="reinitialiser">Réinitialiser toutes les données</button></p>
     </div>
   </div>`;
@@ -908,6 +927,7 @@ const actions = {
   'reinitialiser': () => {
     if (!confirmer('Effacer TOUTES les données (carte, commandes, réservations, stock) ? Cette action est irréversible.')) return;
     if (syncEtat.connecte && !confirmer('La synchronisation est active : les données seront aussi effacées sur TOUS les appareils. Continuer ?')) return;
+    copieSecurite('avant réinitialisation');
     db = structuredClone(DONNEES_DEMO);
     tableSelectionnee = null;
     sauver(); rendre();
@@ -975,6 +995,7 @@ document.addEventListener('change', e => {
         if (!confirmer(syncEtat.connecte
           ? 'Remplacer toutes les données par celles du fichier, sur TOUS les appareils synchronisés ?'
           : 'Remplacer toutes les données actuelles par celles du fichier ?')) return;
+        copieSecurite('avant import');
         db = migrer(data);
         sauver(); rendre();
         window.syncApi?.envoyerMaintenant();
@@ -2240,6 +2261,7 @@ function demanderChoixSync(nbEnLigne) {
 
 window.app = {
   donnees: () => db,
+  copieSecurite,
   ecrireLocal,
   rafraichir,
   majIndicateurSync,
@@ -2247,6 +2269,15 @@ window.app = {
 };
 
 Object.assign(actions, {
+  'restaurer-copie': el => {
+    const c = copiesSecurite()[el.dataset.i];
+    if (!c || !confirmer(`Restaurer la copie du ${new Date(c.date).toLocaleString('fr-FR')} ?${syncEtat.connecte ? ' Elle remplacera les données sur TOUS les appareils synchronisés.' : ''}`)) return;
+    copieSecurite('avant restauration');
+    db = migrer(c.donnees);
+    sauver(); rendre();
+    window.syncApi?.envoyerMaintenant();
+    alert('Copie restaurée.');
+  },
   'sync-deconnexion': () => {
     if (!confirmer('Déconnecter cet appareil ? Ses données restent disponibles, mais ne seront plus partagées.')) return;
     window.syncApi?.deconnecter();

@@ -239,3 +239,8 @@ details.card summary { cursor: pointer; font-weight: 600; }
   font-size: .82rem; padding: 6px 10px; border-radius: 6px; max-width: 320px; box-shadow: 0 4px 14px #0003; }
 
 .hbar-produit .hbar-label small { display: block; font-size: .75rem; color: var(--muted); }
+
+/* Modes de service (sur place / à emporter / livraison) */
+.onglets.modes { flex-wrap: wrap; }
+.onglets.modes .btn { font-weight: 600; }
+.compteur { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 4px; border-radius: 999px; background: #0000001f; font-size: .8rem; }

@@ -180,7 +180,8 @@ vues.tableau = () => {
     <div class="grid cols-4">
       <div class="card stat"><div class="label">Chiffre d'affaires du jour</div><div class="value">${dh(ca)}</div></div>
       <div class="card stat"><div class="label">Tickets encaissés</div><div class="value">${payeesJour.length}</div></div>
-      <div class="card stat"><div class="label">Tables occupées</div><div class="value">${ouvertes.length} / ${db.tables.length}</div></div>
+      <div class="card stat"><div class="label">Tables occupées</div><div class="value">${ouvertes.filter(c => modeDe(c) === 'sur_place').length} / ${db.tables.length}</div>
+        ${ouvertes.some(c => modeDe(c) !== 'sur_place') ? `<div class="muted small-note">+ ${ouvertes.filter(c => modeDe(c) === 'emporter').length} à emporter · ${ouvertes.filter(c => modeDe(c) === 'livraison').length} en livraison</div>` : ''}</div>
       <div class="card stat"><div class="label">Couverts réservés aujourd'hui</div><div class="value">${couverts}</div></div>
     </div>
     <div class="grid cols-2" style="margin-top:16px">
@@ -210,16 +211,56 @@ vues.tableau = () => {
 /* ---------- Commandes (plan de salle) ---------- */
 let tableSelectionnee = null;
 
+const MODES = {
+  sur_place: { libelle: 'Sur place', icone: '🍽️' },
+  emporter: { libelle: 'À emporter', icone: '🥡' },
+  livraison: { libelle: 'Livraison', icone: '🛵' },
+};
+const modeDe = c => (MODES[c.type] ? c.type : 'sur_place');
+let modeSalle = 'sur_place';
+
 vues.commandes = () => {
-  if (tableSelectionnee && db.tables.some(t => t.id === tableSelectionnee)) {
+  if (tableSelectionnee && (db.tables.some(t => t.id === tableSelectionnee) || commandeOuverte(tableSelectionnee))) {
     return vuePriseCommande(tableSelectionnee);
   }
   tableSelectionnee = null;
+  const enCours = type => db.commandes.filter(c => c.statut === 'ouverte' && modeDe(c) === type);
+  const onglets = `
+    <div class="onglets modes">
+      ${Object.entries(MODES).map(([k, m]) => {
+        const n = enCours(k).length;
+        return `<button class="btn ${modeSalle === k ? 'primary' : ''}" data-action="mode-salle" data-mode="${k}">
+          ${m.icone} ${m.libelle}${n ? ` <span class="compteur">${n}</span>` : ''}</button>`;
+      }).join('')}
+    </div>`;
+
+  if (modeSalle !== 'sur_place') {
+    const m = MODES[modeSalle];
+    const liste = enCours(modeSalle).sort((a, b) => a.ouverteLe.localeCompare(b.ouverteLe));
+    return `
+      <div class="toolbar">
+        <h1>${m.icone} ${m.libelle}</h1>
+        <button class="btn primary" data-action="nouvelle-commande-externe">+ Nouvelle commande ${modeSalle === 'livraison' ? 'à livrer' : 'à emporter'}</button>
+      </div>
+      ${onglets}
+      <p class="muted">Commandes en cours. Cliquez sur une commande pour la compléter ou l'encaisser.</p>
+      <div class="grid tables">
+        ${liste.map(c => `
+          <div class="card table-tile ${c.lignes.length ? 'busy' : ''}" data-action="ouvrir-table" data-id="${esc(c.tableId)}">
+            <div class="name">${esc(c.client?.nom || c.tableNom)}</div>
+            <div class="info">${dh(totalCommande(c))} · ${fmtHeure(c.ouverteLe)}</div>
+            ${c.client?.tel ? `<div class="info">📞 ${esc(c.client.tel)}</div>` : ''}
+            ${c.client?.adresse ? `<div class="info">📍 ${esc(c.client.adresse)}</div>` : ''}
+          </div>`).join('') || `<div class="empty">Aucune commande ${modeSalle === 'livraison' ? 'à livrer' : 'à emporter'} en cours.</div>`}
+      </div>`;
+  }
+
   return `
     <div class="toolbar">
       <h1>Plan de salle</h1>
       <button class="btn" data-action="ajouter-table">+ Ajouter une table</button>
     </div>
+    ${onglets}
     <p class="muted">Cliquez sur une table pour ouvrir ou compléter sa commande.</p>
     <div class="grid tables">
       ${db.tables.map(t => {
@@ -238,15 +279,19 @@ function vuePriseCommande(tableId) {
   const c = commandeOuverte(tableId);
   const lignes = c ? c.lignes : [];
   const dispo = db.carte.filter(p => p.disponible);
+  const mode = MODES[c ? modeDe(c) : 'sur_place'];
 
   return `
     <div class="toolbar">
-      <h1>${esc(table.nom)}</h1>
+      <h1>${table ? esc(table.nom) : `${mode.icone} ${esc(c.tableNom)}`}</h1>
       <div>
-        <button class="btn" data-action="retour-salle">← Plan de salle</button>
-        <button class="btn danger" data-action="supprimer-table" data-id="${table.id}">Supprimer la table</button>
+        <button class="btn" data-action="retour-salle">← ${table ? 'Plan de salle' : mode.libelle}</button>
+        ${table ? `<button class="btn danger" data-action="supprimer-table" data-id="${table.id}">Supprimer la table</button>`
+          : `<button class="btn" data-action="modifier-client">Modifier le client</button>`}
       </div>
     </div>
+    ${!table && c.client && (c.client.tel || c.client.adresse) ? `<p class="muted">
+      ${c.client.tel ? `📞 ${esc(c.client.tel)}` : ''} ${c.client.adresse ? ` · 📍 ${esc(c.client.adresse)}` : ''}</p>` : ''}
     <div class="order-layout">
       <div class="card">
         <h2>Carte</h2>
@@ -380,7 +425,7 @@ function ajouterLigne(plat, taille, variante) {
   let c = commandeOuverte(tableSelectionnee);
   if (!c) {
     c = { id: uid(), tableId: tableSelectionnee, tableNom: db.tables.find(t => t.id === tableSelectionnee).nom,
-      lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString() };
+      lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString(), type: 'sur_place' };
     db.commandes.push(c);
   }
   const nomTaille = taille?.nom || null;
@@ -566,6 +611,8 @@ vues.ventes = () => {
 
   const parPaiement = {};
   payees.forEach(c => { parPaiement[c.paiement] = (parPaiement[c.paiement] || 0) + totalCommande(c); });
+  const parMode = {};
+  payees.forEach(c => { const m = MODES[modeDe(c)].libelle; parMode[m] = (parMode[m] || 0) + totalCommande(c); });
 
 
   const ca = payees.reduce((s, c) => s + totalCommande(c), 0);
@@ -611,6 +658,11 @@ vues.ventes = () => {
         ${Object.keys(parPaiement).length ? `
           <table class="list">
             ${Object.entries(parPaiement).map(([m, v]) => `<tr><td>${esc(m)}</td><td class="num">${dh(v)}</td></tr>`).join('')}
+          </table>` : '<div class="empty">—</div>'}
+        <h2 style="margin-top:20px">Par mode de service</h2>
+        ${Object.keys(parMode).length ? `
+          <table class="list">
+            ${Object.entries(parMode).map(([m, v]) => `<tr><td>${esc(m)}</td><td class="num">${dh(v)}</td></tr>`).join('')}
           </table>` : '<div class="empty">—</div>'}
         <h2 style="margin-top:20px">Derniers tickets</h2>
         ${payees.length ? `
@@ -674,6 +726,31 @@ const actions = {
       <label>Nombre de places<input name="places" type="number" min="1" required value="4"></label>`,
     d => { db.tables.push({ id: uid(), nom: d.nom.trim(), places: Number(d.places) }); }),
 
+  'mode-salle': el => { modeSalle = el.dataset.mode; rendre(); },
+
+  'nouvelle-commande-externe': () => {
+    const type = modeSalle;
+    const livraison = type === 'livraison';
+    ouvrirModal(livraison ? 'Nouvelle commande à livrer' : 'Nouvelle commande à emporter', formClient({}, livraison), d => {
+      const jour = aujourdHui();
+      const numero = db.commandes.filter(c => modeDe(c) !== 'sur_place' && jourDe(c.ouverteLe) === jour).length + 1;
+      const client = lireClient(d);
+      const c = { id: uid(), tableId: 'ext-' + uid(), type, client, lignes: [], statut: 'ouverte', ouverteLe: new Date().toISOString(),
+        tableNom: `${MODES[type].libelle} n° ${numero}${client.nom ? ' — ' + client.nom : ''}` };
+      if (livraison && Number(d.frais) > 0) c.lignes.push({ platId: null, nom: 'Frais de livraison', prix: Number(d.frais), supplement: 0, qte: 1 });
+      db.commandes.push(c);
+      tableSelectionnee = c.tableId;
+    }, 'Créer la commande');
+  },
+
+  'modifier-client': () => {
+    const c = commandeOuverte(tableSelectionnee);
+    ouvrirModal('Client', formClient(c.client || {}, modeDe(c) === 'livraison', false), d => {
+      c.client = lireClient(d);
+      c.tableNom = c.tableNom.replace(/ — .*$/, '') + (c.client.nom ? ' — ' + c.client.nom : '');
+    });
+  },
+
   'ouvrir-table': el => { tableSelectionnee = el.dataset.id; rendre(); },
   'retour-salle': () => { tableSelectionnee = null; rendre(); },
 
@@ -701,7 +778,7 @@ const actions = {
     const c = commandeOuverte(tableSelectionnee);
     const l = c.lignes[el.dataset.i];
     if (--l.qte <= 0) c.lignes.splice(el.dataset.i, 1);
-    if (!c.lignes.length) db.commandes = db.commandes.filter(x => x !== c);
+    if (!c.lignes.length && modeDe(c) === 'sur_place') db.commandes = db.commandes.filter(x => x !== c);
     sauver(); rendre();
   },
 
@@ -815,6 +892,18 @@ const actions = {
   },
 };
 
+function formClient(cl, livraison, avecFrais = true) {
+  return `
+    <label>Nom du client${livraison ? '' : ' (facultatif)'}<input name="nom" ${livraison ? 'required' : ''} value="${esc(cl.nom)}"></label>
+    <label>Téléphone${livraison ? '' : ' (facultatif)'}<input name="tel" type="tel" ${livraison ? 'required' : ''} value="${esc(cl.tel)}"></label>
+    ${livraison ? `<label>Adresse de livraison<textarea name="adresse" rows="2" required>${esc(cl.adresse)}</textarea></label>` : ''}
+    ${livraison && avecFrais ? '<label>Frais de livraison (DH, facultatif)<input name="frais" type="number" step="0.01" min="0" placeholder="0"></label>' : ''}`;
+}
+
+function lireClient(d) {
+  return { nom: (d.nom || '').trim(), tel: (d.tel || '').trim(), adresse: (d.adresse || '').trim() };
+}
+
 function nettoyerResa(d) {
   return { nom: d.nom.trim(), tel: d.tel.trim(), date: d.date, heure: d.heure,
     couverts: Number(d.couverts), tableId: d.tableId || null, note: d.note.trim() };
@@ -830,7 +919,9 @@ function imprimerAddition(c) {
     <style>body{font-family:monospace;padding:16px;max-width:320px}h2{text-align:center;margin:0 0 4px}
     .c{text-align:center}.l{display:flex;justify-content:space-between}hr{border:none;border-top:1px dashed #000}</style></head><body>
     <h2>${esc(db.restaurant.nom)}</h2>
-    <div class="c">${esc(c.tableNom)} — ${new Date().toLocaleString('fr-FR')}</div><hr>
+    <div class="c">${esc(c.tableNom)} — ${new Date().toLocaleString('fr-FR')}</div>
+    ${modeDe(c) !== 'sur_place' ? `<div class="c">${MODES[modeDe(c)].libelle}${c.client?.tel ? ' — ' + esc(c.client.tel) : ''}</div>` : ''}
+    ${c.client?.adresse ? `<div class="c">${esc(c.client.adresse)}</div>` : ''}<hr>
     ${c.lignes.map(l => `<div class="l"><span>${l.qte} × ${esc(l.nom)}</span><span>${dh(l.qte * l.prix)}</span></div>`).join('')}
     <hr><div class="l"><span>Total HT</span><span>${dh(ht)}</span></div>
     <div class="l"><span>TVA ${tva} %</span><span>${dh(total - ht)}</span></div>
@@ -1651,6 +1742,7 @@ Object.assign(actions, {
     const c = db.commandes.find(x => x.id === el.dataset.id);
     ouvrirFacture({
       commandeId: c.id, date: jourDe(c.payeeLe), paiement: c.paiement,
+      client: c.client ? { nom: c.client.nom || '', adresse: c.client.adresse || '', ice: '' } : undefined,
       lignes: c.lignes.map(l => ({ designation: l.nom, qte: l.qte, pu: l.prix })),
     });
   },

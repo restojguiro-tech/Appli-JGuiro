@@ -54,7 +54,8 @@ function nomLigne(l) {
   const p = platDe(l.id);
   const t = l.ti >= 0 ? p.tailles[l.ti] : null;
   const v = l.vi >= 0 ? p.variantes[l.vi] : null;
-  return p.nom + (t ? (t.nom ? ` — ${t.nom}` : ` ${dh(t.prix)}`) : '') + (v ? ` (${v.nom})` : '');
+  const nomT = t ? [t.groupe, t.nom].filter(Boolean).join(' ') : '';
+  return p.nom + (t ? (nomT ? ` — ${nomT}${t.nom ? '' : ' ' + dh(t.prix)}` : ` ${dh(t.prix)}`) : '') + (v ? ` (${v.nom})` : '');
 }
 
 const totalPanier = () => panier.reduce((s, l) => s + prixLigne(l) * l.qte, 0);
@@ -83,11 +84,15 @@ function rendreCarte() {
     <h2 id="${ancre(c)}">${esc(c)}</h2>
     ${menu.plats.filter(p => p.categorie === c).map(p => {
       const dansPanier = panier.filter(l => l.id === p.id).reduce((s, l) => s + l.qte, 0);
-      const prix = p.tailles.length
-        ? `dès ${dh(Math.min(...p.tailles.map(t => t.prix)))}`
+      const taillesDispo = p.tailles.filter(t => t.disponible !== false);
+      if (p.tailles.length && !taillesDispo.length) return ''; // tout le plat est épuisé
+      const prix = taillesDispo.length
+        ? `${taillesDispo.length > 1 ? 'dès ' : ''}${dh(Math.min(...taillesDispo.map(t => t.prix)))}`
         : dh(p.prix);
+      const groupes = [...new Set(taillesDispo.map(t => t.groupe).filter(Boolean))];
       const detail = [
-        p.tailles.length && p.tailles.some(t => t.nom) ? p.tailles.map(t => t.nom).filter(Boolean).join(' · ') : '',
+        groupes.length ? groupes.join(' · ')
+          : taillesDispo.some(t => t.nom) ? taillesDispo.map(t => t.nom).filter(Boolean).join(' · ') : '',
         p.variantes.some(v => v.disponible !== false) ? p.variantes.filter(v => v.disponible !== false).map(v => v.nom).join(' · ') : '',
       ].filter(Boolean).join(' — ');
       return `
@@ -124,16 +129,23 @@ function ajouter(id, ti = -1, vi = -1) {
 function choisirOptions(p) {
   // Numéros des options encore disponibles (les épuisées ne sont pas proposées)
   const variantesDispo = p.variantes.map((v, i) => (v.disponible === false ? -1 : i)).filter(i => i >= 0);
-  if (!p.tailles.length && !variantesDispo.length) return ajouter(p.id);
+  const taillesDispo = p.tailles.map((t, i) => ({ t, i })).filter(x => x.t.disponible !== false);
+  if (!taillesDispo.length && !variantesDispo.length) return ajouter(p.id);
+  // Sous-menus (ex. Poulet → Frit, Sauté…) : on choisit d'abord le sous-menu, puis la portion
+  const groupes = [...new Set(taillesDispo.map(x => x.t.groupe || ''))];
+  const avecGroupes = groupes.some(Boolean);
   $('#options-titre').textContent = p.nom;
   $('#options-corps').innerHTML = `
-    ${p.tailles.length ? `
-      <div class="groupe-titre">Choisissez ${p.tailles.some(t => t.nom) ? 'la taille' : 'le prix'}</div>
+    ${avecGroupes && groupes.length > 1 ? `
+      <div class="groupe-titre">Choisissez</div>
       <div class="options-liste">
-        ${p.tailles.map((t, i) => `
-          <label class="option"><input type="radio" name="ti" value="${i}" ${i === 0 ? 'checked' : ''}>
-            <span>${esc(t.nom || dh(t.prix))}</span><span>${dh(t.prix)}</span></label>`).join('')}
+        ${groupes.map((g, k) => {
+          const prix = taillesDispo.filter(x => (x.t.groupe || '') === g).map(x => x.t.prix);
+          return `<label class="option"><input type="radio" name="gi" value="${esc(g)}" ${k === 0 ? 'checked' : ''}>
+            <span>${esc(g || p.nom)}</span><span>${prix.length > 1 ? 'dès ' : ''}${dh(Math.min(...prix))}</span></label>`;
+        }).join('')}
       </div>` : ''}
+    <div id="zone-tailles"></div>
     ${variantesDispo.length ? `
       <div class="groupe-titre">Choisissez une option</div>
       <div class="options-liste">
@@ -141,12 +153,26 @@ function choisirOptions(p) {
           <label class="option"><input type="radio" name="vi" value="${i}" ${i === variantesDispo[0] ? 'checked' : ''}>
             <span>${esc(v.nom)}</span><span>${v.supplement ? '+ ' + dh(v.supplement) : ''}</span></label>`).join('')}
       </div>` : ''}`;
+  const rendreTailles = () => {
+    const g = avecGroupes ? ($('input[name=gi]:checked')?.value ?? groupes[0]) : null;
+    const liste = g == null ? taillesDispo : taillesDispo.filter(x => (x.t.groupe || '') === g);
+    $('#zone-tailles').innerHTML = liste.length > 1 ? `
+      <div class="groupe-titre">Choisissez ${liste.some(x => x.t.nom) ? 'la portion' : 'le prix'}${g ? ` — ${esc(g)}` : ''}</div>
+      <div class="options-liste">
+        ${liste.map(({ t, i }, k) => `
+          <label class="option"><input type="radio" name="ti" value="${i}" ${k === 0 ? 'checked' : ''}>
+            <span>${esc(t.nom || dh(t.prix))}</span><span>${dh(t.prix)}</span></label>`).join('')}
+      </div>` : liste.length ? `<input type="hidden" name="ti" value="${liste[0].i}">` : '';
+  };
+  rendreTailles();
+  $$('input[name=gi]').forEach(r => r.addEventListener('change', rendreTailles));
   const dlg = $('#options');
   dlg.returnValue = '';
   dlg.showModal();
   dlg.onclose = () => {
     if (dlg.returnValue !== 'ok') return;
-    const ti = p.tailles.length ? Number($('input[name=ti]:checked', dlg)?.value ?? 0) : -1;
+    const champ = $('input[name=ti]:checked', dlg) || $('input[name=ti][type=hidden]', dlg);
+    const ti = taillesDispo.length ? Number(champ?.value ?? taillesDispo[0].i) : -1;
     const vi = variantesDispo.length ? Number($('input[name=vi]:checked', dlg)?.value ?? variantesDispo[0]) : -1;
     ajouter(p.id, ti, vi);
   };

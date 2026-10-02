@@ -263,3 +263,9 @@ details.card summary { cursor: pointer; font-weight: 600; }
 .puces-variantes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .puce { font: inherit; font-size: .78rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: #dcefe3; color: var(--ok); cursor: pointer; }
 .puce.epuisee { background: #f7dcda; color: var(--danger); text-decoration: line-through; }
+
+/* Sous-menus de prix */
+.groupe-prix { border: 1px dashed var(--line); border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+.gp-entete { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; margin-bottom: 6px; }
+.gp-entete .gp-nom { font-weight: 600; }
+.sous-menu { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; }

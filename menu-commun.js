@@ -38,7 +38,11 @@ function construireMenuPublic(d) {
     categories: [...new Set(plats.map(p => p.categorie))],
     plats: plats.map(p => ({
       id: p.id, nom: p.nom, categorie: p.categorie, prix: Number(p.prix),
-      tailles: (p.tailles || []).map(t => ({ nom: t.nom || '', prix: Number(t.prix) })),
+      tailles: (p.tailles || []).map(t => ({
+        nom: t.nom || '', prix: Number(t.prix),
+        ...(t.groupe ? { groupe: t.groupe } : {}),
+        ...(t.disponible === false ? { disponible: false } : {}),
+      })),
       // Les variantes épuisées restent dans la liste (pour garder les mêmes numéros) mais sont signalées
       variantes: (p.variantes || []).map(v => ({ nom: v.nom, supplement: Number(v.supplement) || 0, ...(v.disponible === false ? { disponible: false } : {}) })),
     })),

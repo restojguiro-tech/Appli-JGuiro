@@ -149,7 +149,10 @@ const variantesDe = p => p.variantes || [];
 // Un plat peut avoir plusieurs prix (ex. : Sole 100, 120, 130 DH), chacun avec une précision facultative (ex. : 500 g).
 const taillesDe = p => p.tailles || [];
 const prixMin = plat => taillesDe(plat).length ? Math.min(...taillesDe(plat).map(t => Number(t.prix))) : Number(plat.prix);
-const libellePrix = t => dh(t.prix) + (t.nom ? ` (${t.nom})` : '');
+const nomTailleDe = t => [t.groupe, t.nom].filter(Boolean).join(' ');
+const libellePrix = t => dh(t.prix) + (nomTailleDe(t) ? ` (${nomTailleDe(t)})` : '');
+// Sous-menus d'un plat (ex. Poulet → Frit, Sauté…) : noms des groupes de prix, dans l'ordre
+const groupesDe = plat => [...new Set(taillesDe(plat).map(t => t.groupe || ''))].filter(Boolean);
 const fmtSupplement = v => (v.supplement ? ` (+${dh(v.supplement)})` : '');
 
 /* =========================================================
@@ -382,7 +385,14 @@ vues.carte = () => `
         ${db.carte.filter(p => p.categorie === cat).map(p => `
           <tr>
             <td>${esc(p.nom)}
-              ${taillesDe(p).length ? `<div class="muted small-note">Prix : ${taillesDe(p).map(t => esc(libellePrix(t))).join(' · ')}</div>` : ''}
+              ${groupesDe(p).length ? groupesDe(p).map(g => {
+                const ts = taillesDe(p).filter(t => t.groupe === g);
+                const epuise = ts.every(t => t.disponible === false);
+                return `<div class="small-note sous-menu"><button class="puce ${epuise ? 'epuisee' : ''}" data-action="basculer-groupe" data-id="${p.id}" data-g="${esc(g)}"
+                  title="${epuise ? 'Épuisé — cliquer pour le remettre' : 'Disponible — cliquer pour le marquer épuisé'}">${esc(g)}</button>
+                  <span class="muted">${ts.map(t => esc(dh(t.prix) + (t.nom ? ' ' + t.nom : ''))).join(' · ')}</span></div>`;
+              }).join('')
+              : taillesDe(p).length ? `<div class="muted small-note">Prix : ${taillesDe(p).map(t => esc(libellePrix(t))).join(' · ')}</div>` : ''}
               ${variantesDe(p).length ? `<div class="puces-variantes">${variantesDe(p).map((v, i) => `
                 <button class="puce ${v.disponible === false ? 'epuisee' : ''}" data-action="basculer-variante" data-id="${p.id}" data-i="${i}"
                   title="${v.disponible === false ? 'Épuisée — cliquer pour la remettre' : 'Disponible — cliquer pour la marquer épuisée'}">${esc(v.nom)}${esc(fmtSupplement(v))}</button>`).join('')}</div>` : ''}</td>
@@ -399,16 +409,21 @@ vues.carte = () => `
 
 function formPlat(p = {}) {
   const lignesPrix = taillesDe(p).length ? taillesDe(p) : [{ nom: '', prix: p.prix ?? '' }];
+  // Regroupe les prix par sous-menu (un seul groupe sans nom pour un plat simple)
+  const groupes = [];
+  lignesPrix.forEach(t => {
+    let g = groupes.find(x => x.nom === (t.groupe || ''));
+    if (!g) groupes.push(g = { nom: t.groupe || '', disponible: t.disponible !== false, lignes: [] });
+    g.lignes.push(t);
+  });
   return `
     <label>Nom<input name="nom" required value="${esc(p.nom)}"></label>
-    <div class="row">
-      <label>Catégorie<input name="categorie" required list="liste-cat" value="${esc(p.categorie)}"></label>
-      <div class="bloc-prix">
-        <span class="bloc-label">Prix (DH)</span>
-        <div id="liste-prix">${lignesPrix.map(lignePrix).join('')}</div>
-        <button type="button" class="btn small" data-action="ajouter-prix">+ Ajouter un prix</button>
-      </div>
-    </div>
+    <label>Catégorie<input name="categorie" required list="liste-cat" value="${esc(p.categorie)}"></label>
+    <fieldset class="variantes">
+      <legend>Prix (DH) — et sous-menus si besoin (ex. : Poulet → Frit, Sauté, Choukouya…)</legend>
+      <div id="liste-groupes">${groupes.map(groupePrix).join('')}</div>
+      <button type="button" class="btn small" data-action="ajouter-groupe">+ Ajouter un sous-menu</button>
+    </fieldset>
     <datalist id="liste-cat">${categories().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <label><input type="checkbox" name="disponible" style="width:auto" ${p.disponible !== false ? 'checked' : ''}> Disponible</label>
     <fieldset class="variantes">
@@ -428,17 +443,34 @@ function ligneVariante(v = {}) {
     </div>`;
 }
 
+function groupePrix(g = { nom: '', disponible: true, lignes: [{}] }) {
+  return `
+    <div class="groupe-prix">
+      <div class="gp-entete">
+        <input class="gp-nom" placeholder="Sous-menu (facultatif) — ex. : Frit" value="${esc(g.nom)}">
+        <label class="v-dispo-label" title="Décochez si ce sous-menu est épuisé"><input type="checkbox" class="gp-dispo" ${g.disponible ? 'checked' : ''}> Dispo</label>
+        <button type="button" class="btn small danger" data-action="retirer-groupe" title="Supprimer ce sous-menu et ses prix">✕</button>
+      </div>
+      <div class="gp-lignes">${g.lignes.map(lignePrix).join('')}</div>
+      <button type="button" class="btn small" data-action="ajouter-prix">+ Ajouter un prix</button>
+    </div>`;
+}
+
 function lignePrix(t = {}) {
   return `
     <div class="prix-row">
       <input class="px-prix" type="number" step="0.01" min="0" placeholder="DH" value="${esc(t.prix ?? '')}">
-      <input class="px-nom" placeholder="Ex. 500 g" title="Précision facultative (ex. : 500 g, Grand…)" value="${esc(t.nom)}">
+      <input class="px-nom" placeholder="Portion — ex. : 1/4" title="Précision facultative (ex. : 1/4, 500 g, Grand…)" value="${esc(t.nom)}">
       <button type="button" class="btn small danger" data-action="retirer-prix" title="Retirer ce prix">✕</button>
     </div>`;
 }
 
 function lirePrix() {
-  return $$('#liste-prix .prix-row').map(r => ({ prix: $('.px-prix', r).value, nom: $('.px-nom', r).value.trim() }));
+  return $$('#liste-groupes .groupe-prix').flatMap(g => {
+    const groupe = $('.gp-nom', g).value.trim();
+    const dispo = $('.gp-dispo', g).checked;
+    return $$('.prix-row', g).map(r => ({ groupe, dispo, prix: $('.px-prix', r).value, nom: $('.px-nom', r).value.trim() }));
+  });
 }
 
 function lireVariantes() {
@@ -452,10 +484,15 @@ function lirePlat(d) {
   const lignes = lirePrix();
   const sansPrix = lignes.find(l => l.nom && l.prix === '');
   if (sansPrix) { alert(`Indiquez le prix pour « ${sansPrix.nom} ».`); return null; }
-  const prixListe = lignes.filter(l => l.prix !== '').map(l => ({ nom: l.nom, prix: Number(l.prix) }));
+  const prixListe = lignes.filter(l => l.prix !== '').map(l => ({
+    nom: l.nom, prix: Number(l.prix),
+    ...(l.groupe ? { groupe: l.groupe } : {}),
+    ...(l.dispo ? {} : { disponible: false }),
+  }));
   if (!prixListe.length) { alert('Indiquez au moins un prix.'); return null; }
+  const avecSousMenus = prixListe.some(t => t.groupe);
   return { nom: d.nom.trim(), categorie: d.categorie.trim(), prix: Math.min(...prixListe.map(l => l.prix)),
-    disponible: d.disponible, variantes: lireVariantes(), tailles: prixListe.length > 1 ? prixListe : [] };
+    disponible: d.disponible, variantes: lireVariantes(), tailles: prixListe.length > 1 || avecSousMenus ? prixListe : [] };
 }
 
 function ajouterLigne(plat, taille, variante) {
@@ -470,7 +507,7 @@ function ajouterLigne(plat, taille, variante) {
 }
 
 function ajouterLigneA(c, plat, taille, variante, qte) {
-  const nomTaille = taille?.nom || null;
+  const nomTaille = (taille && nomTailleDe(taille)) || null;
   const nomVariante = variante ? variante.nom : null;
   const prixBase = Number(taille ? taille.prix : plat.prix);
   const prix = prixBase + (variante ? variante.supplement : 0);
@@ -481,7 +518,7 @@ function ajouterLigneA(c, plat, taille, variante, qte) {
     platId: plat.id,
     taille: nomTaille,
     variante: nomVariante,
-    nom: plat.nom + (nomTaille ? ` — ${nomTaille}` : taille ? ` ${dh(taille.prix)}` : '') + (variante ? ` (${variante.nom})` : ''),
+    nom: plat.nom + (nomTaille ? ` — ${nomTaille}${!taille.nom ? ' ' + dh(taille.prix) : ''}` : taille ? ` ${dh(taille.prix)}` : '') + (variante ? ` (${variante.nom})` : ''),
     supplement: variante ? variante.supplement : 0,
     prix,
     qte,
@@ -489,18 +526,40 @@ function ajouterLigneA(c, plat, taille, variante, qte) {
 }
 
 // Demande le prix (si le plat en a plusieurs) puis la variante, avant d'ajouter la ligne.
-function choisirOptions(plat, iTaille = null) {
+function choisirOptions(plat, iTaille = null, groupe = null) {
   const tailles = taillesDe(plat);
   const variantes = variantesDe(plat);
   if (tailles.length && iTaille == null) {
-    return ouvrirModal(plat.nom, `
-      <p class="muted">Choisissez le prix :</p>
-      <div class="choix-variantes">
-        ${tailles.map((t, i) => `
-          <button type="button" class="btn" data-action="choisir-taille" data-id="${plat.id}" data-t="${i}">
-            ${dh(t.prix)}<span class="muted">${esc(t.nom)}</span>
-          </button>`).join('')}
-      </div>`, null, null);
+    const dispo = tailles.map((t, i) => ({ t, i })).filter(x => x.t.disponible !== false);
+    if (!dispo.length) return alert(`« ${plat.nom} » est épuisé.`);
+    const groupes = [...new Set(dispo.map(x => x.t.groupe || ''))];
+    if (groupes.some(Boolean) && groupe == null) {
+      if (groupes.length > 1) {
+        return ouvrirModal(plat.nom, `
+          <p class="muted">Choisissez :</p>
+          <div class="choix-variantes">
+            ${groupes.map(g => {
+              const prix = dispo.filter(x => (x.t.groupe || '') === g).map(x => x.t.prix);
+              return `<button type="button" class="btn" data-action="choisir-groupe" data-id="${plat.id}" data-g="${esc(g)}">
+                ${esc(g || plat.nom)}<span class="muted">${prix.length > 1 ? 'dès ' : ''}${dh(Math.min(...prix))}</span></button>`;
+            }).join('')}
+          </div>
+          ${groupesDe(plat).filter(g => !groupes.includes(g)).length ? `<p class="muted small-note">Épuisé : ${groupesDe(plat).filter(g => !groupes.includes(g)).map(esc).join(', ')}</p>` : ''}`, null, null);
+      }
+      groupe = groupes[0];
+    }
+    const liste = groupe == null ? dispo : dispo.filter(x => (x.t.groupe || '') === groupe);
+    if (liste.length > 1) {
+      return ouvrirModal(plat.nom + (groupe ? ` — ${groupe}` : ''), `
+        <p class="muted">Choisissez ${liste.some(x => x.t.nom) ? 'la portion' : 'le prix'} :</p>
+        <div class="choix-variantes">
+          ${liste.map(({ t, i }) => `
+            <button type="button" class="btn" data-action="choisir-taille" data-id="${plat.id}" data-t="${i}">
+              ${dh(t.prix)}<span class="muted">${esc(t.nom)}</span>
+            </button>`).join('')}
+        </div>`, null, null);
+    }
+    iTaille = liste[0].i;
   }
   const taille = iTaille == null ? null : tailles[iTaille];
   if (variantes.some(v => v.disponible !== false)) {
@@ -809,6 +868,7 @@ const actions = {
   'ajouter-ligne': el => choisirOptions(db.carte.find(p => p.id === el.dataset.id)),
 
   'choisir-taille': el => choisirOptions(db.carte.find(p => p.id === el.dataset.id), Number(el.dataset.t)),
+  'choisir-groupe': el => choisirOptions(db.carte.find(p => p.id === el.dataset.id), null, el.dataset.g),
 
   'choisir-variante': el => {
     const plat = db.carte.find(p => p.id === el.dataset.id);
@@ -866,11 +926,30 @@ const actions = {
       Object.assign(p, plat);
     });
   },
-  'ajouter-prix': () => {
-    $('#liste-prix').insertAdjacentHTML('beforeend', lignePrix());
-    $('#liste-prix .prix-row:last-child .px-prix').focus();
+  'ajouter-prix': el => {
+    const lignes = $('.gp-lignes', el.closest('.groupe-prix'));
+    lignes.insertAdjacentHTML('beforeend', lignePrix());
+    $('.prix-row:last-child .px-prix', lignes).focus();
   },
   'retirer-prix': el => el.closest('.prix-row').remove(),
+  // Nouveau sous-menu : reprend les portions du premier (1/4, 1/2…) avec des prix à remplir
+  'ajouter-groupe': () => {
+    const premier = $('#liste-groupes .groupe-prix');
+    const portions = premier ? $$('.px-nom', premier).map(i => i.value.trim()).filter(Boolean) : [];
+    const html = groupePrix({ nom: '', disponible: true, lignes: portions.length ? portions.map(nom => ({ nom })) : [{}] });
+    $('#liste-groupes').insertAdjacentHTML('beforeend', html);
+    $('#liste-groupes .groupe-prix:last-child .gp-nom').focus();
+  },
+  'retirer-groupe': el => {
+    el.closest('.groupe-prix').remove();
+    if (!$('#liste-groupes .groupe-prix')) $('#liste-groupes').insertAdjacentHTML('beforeend', groupePrix());
+  },
+  'basculer-groupe': el => {
+    const ts = taillesDe(db.carte.find(p => p.id === el.dataset.id)).filter(t => t.groupe === el.dataset.g);
+    const epuise = ts.every(t => t.disponible === false);
+    ts.forEach(t => { if (epuise) delete t.disponible; else t.disponible = false; });
+    sauver(); rendre();
+  },
   'basculer-variante': el => {
     const v = variantesDe(db.carte.find(p => p.id === el.dataset.id))[el.dataset.i];
     if (v.disponible === false) delete v.disponible; else v.disponible = false;

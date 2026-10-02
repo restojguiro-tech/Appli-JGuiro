@@ -383,7 +383,9 @@ vues.carte = () => `
           <tr>
             <td>${esc(p.nom)}
               ${taillesDe(p).length ? `<div class="muted small-note">Prix : ${taillesDe(p).map(t => esc(libellePrix(t))).join(' · ')}</div>` : ''}
-              ${variantesDe(p).length ? `<div class="muted small-note">${variantesDe(p).map(v => esc(v.nom) + fmtSupplement(v)).join(' · ')}</div>` : ''}</td>
+              ${variantesDe(p).length ? `<div class="puces-variantes">${variantesDe(p).map((v, i) => `
+                <button class="puce ${v.disponible === false ? 'epuisee' : ''}" data-action="basculer-variante" data-id="${p.id}" data-i="${i}"
+                  title="${v.disponible === false ? 'Épuisée — cliquer pour la remettre' : 'Disponible — cliquer pour la marquer épuisée'}">${esc(v.nom)}${esc(fmtSupplement(v))}</button>`).join('')}</div>` : ''}</td>
             <td class="num">${taillesDe(p).length ? 'dès ' : ''}${dh(prixMin(p))}</td>
             <td><span class="badge ${p.disponible ? 'ok' : 'danger'}">${p.disponible ? 'Disponible' : 'Épuisé'}</span></td>
             <td class="num">
@@ -421,7 +423,8 @@ function ligneVariante(v = {}) {
     <div class="variante-row">
       <input class="v-nom" placeholder="Ex. : À point, Bien cuit…" value="${esc(v.nom)}">
       <input class="v-supp" type="number" step="0.01" min="0" placeholder="+ DH" title="Supplément en DH" value="${v.supplement ? esc(v.supplement) : ''}">
-      <button type="button" class="btn small danger" data-action="retirer-variante" title="Retirer">✕</button>
+      <label class="v-dispo-label" title="Décochez si cette option est épuisée"><input type="checkbox" class="v-dispo" ${v.disponible !== false ? 'checked' : ''}> Dispo</label>
+      <button type="button" class="btn small danger" data-action="retirer-variante" title="Supprimer définitivement">✕</button>
     </div>`;
 }
 
@@ -440,7 +443,8 @@ function lirePrix() {
 
 function lireVariantes() {
   return $$('#variantes .variante-row')
-    .map(r => ({ nom: $('.v-nom', r).value.trim(), supplement: Number($('.v-supp', r).value) || 0 }))
+    .map(r => ({ nom: $('.v-nom', r).value.trim(), supplement: Number($('.v-supp', r).value) || 0,
+      ...($('.v-dispo', r).checked ? {} : { disponible: false }) }))
     .filter(v => v.nom);
 }
 
@@ -499,15 +503,16 @@ function choisirOptions(plat, iTaille = null) {
       </div>`, null, null);
   }
   const taille = iTaille == null ? null : tailles[iTaille];
-  if (variantes.length) {
+  if (variantes.some(v => v.disponible !== false)) {
     return ouvrirModal(plat.nom + (taille ? ` — ${libellePrix(taille)}` : ''), `
       <p class="muted">Choisissez la variante :</p>
       <div class="choix-variantes">
-        ${variantes.map((v, i) => `
+        ${variantes.map((v, i) => v.disponible === false ? '' : `
           <button type="button" class="btn" data-action="choisir-variante" data-id="${plat.id}" data-t="${iTaille ?? ''}" data-i="${i}">
             ${esc(v.nom)}<span class="muted">${v.supplement ? '+' + dh(v.supplement) : ''}</span>
           </button>`).join('')}
-      </div>`, null, null);
+      </div>
+      ${variantes.some(v => v.disponible === false) ? `<p class="muted small-note">Épuisé : ${variantes.filter(v => v.disponible === false).map(v => esc(v.nom)).join(', ')}</p>` : ''}`, null, null);
   }
   if (modal.open) modal.close();
   ajouterLigne(plat, taille, null);
@@ -866,6 +871,11 @@ const actions = {
     $('#liste-prix .prix-row:last-child .px-prix').focus();
   },
   'retirer-prix': el => el.closest('.prix-row').remove(),
+  'basculer-variante': el => {
+    const v = variantesDe(db.carte.find(p => p.id === el.dataset.id))[el.dataset.i];
+    if (v.disponible === false) delete v.disponible; else v.disponible = false;
+    sauver(); rendre();
+  },
   'ajouter-variante': () => {
     $('#variantes').insertAdjacentHTML('beforeend', ligneVariante());
     $('#variantes .variante-row:last-child .v-nom').focus();

@@ -191,7 +191,7 @@ dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top
 .small-note { font-size: .8rem; margin-top: 2px; }
 fieldset.variantes { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0 0 12px; }
 fieldset.variantes legend { color: var(--muted); font-size: .9rem; padding: 0 4px; }
-.variante-row { display: grid; grid-template-columns: 1fr 110px auto; gap: 6px; margin-bottom: 6px; }
+.variante-row { display: grid; grid-template-columns: 1fr 90px auto auto; gap: 6px; margin-bottom: 6px; align-items: center; }
 .choix-variantes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 8px; }
 .choix-variantes .btn { display: flex; flex-direction: column; align-items: center; padding: 14px 10px; font-weight: 600; }
 .choix-variantes .btn .muted { font-weight: 400; font-size: .85rem; }
@@ -256,3 +256,10 @@ details.card summary { cursor: pointer; font-weight: 600; }
 .sync-badge { font-size: 1rem; margin-left: 6px; cursor: help; }
 .erreur-sync { color: var(--danger); }
 .note-sync { background: #dcefe3; color: var(--ok); border-radius: 8px; padding: 8px 12px; }
+
+/* Variantes : disponibilité */
+.v-dispo-label { display: flex; align-items: center; gap: 4px; margin: 0; font-size: .85rem; white-space: nowrap; }
+.v-dispo-label input { width: auto; margin: 0; }
+.puces-variantes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.puce { font: inherit; font-size: .78rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: #dcefe3; color: var(--ok); cursor: pointer; }
+.puce.epuisee { background: #f7dcda; color: var(--danger); text-decoration: line-through; }

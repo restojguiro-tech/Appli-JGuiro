@@ -88,7 +88,7 @@ function rendreCarte() {
         : dh(p.prix);
       const detail = [
         p.tailles.length && p.tailles.some(t => t.nom) ? p.tailles.map(t => t.nom).filter(Boolean).join(' · ') : '',
-        p.variantes.length ? p.variantes.map(v => v.nom).join(' · ') : '',
+        p.variantes.some(v => v.disponible !== false) ? p.variantes.filter(v => v.disponible !== false).map(v => v.nom).join(' · ') : '',
       ].filter(Boolean).join(' — ');
       return `
         <div class="plat">
@@ -122,7 +122,9 @@ function ajouter(id, ti = -1, vi = -1) {
 }
 
 function choisirOptions(p) {
-  if (!p.tailles.length && !p.variantes.length) return ajouter(p.id);
+  // Numéros des options encore disponibles (les épuisées ne sont pas proposées)
+  const variantesDispo = p.variantes.map((v, i) => (v.disponible === false ? -1 : i)).filter(i => i >= 0);
+  if (!p.tailles.length && !variantesDispo.length) return ajouter(p.id);
   $('#options-titre').textContent = p.nom;
   $('#options-corps').innerHTML = `
     ${p.tailles.length ? `
@@ -132,11 +134,11 @@ function choisirOptions(p) {
           <label class="option"><input type="radio" name="ti" value="${i}" ${i === 0 ? 'checked' : ''}>
             <span>${esc(t.nom || dh(t.prix))}</span><span>${dh(t.prix)}</span></label>`).join('')}
       </div>` : ''}
-    ${p.variantes.length ? `
+    ${variantesDispo.length ? `
       <div class="groupe-titre">Choisissez une option</div>
       <div class="options-liste">
-        ${p.variantes.map((v, i) => `
-          <label class="option"><input type="radio" name="vi" value="${i}" ${i === 0 ? 'checked' : ''}>
+        ${p.variantes.map((v, i) => v.disponible === false ? '' : `
+          <label class="option"><input type="radio" name="vi" value="${i}" ${i === variantesDispo[0] ? 'checked' : ''}>
             <span>${esc(v.nom)}</span><span>${v.supplement ? '+ ' + dh(v.supplement) : ''}</span></label>`).join('')}
       </div>` : ''}`;
   const dlg = $('#options');
@@ -145,7 +147,7 @@ function choisirOptions(p) {
   dlg.onclose = () => {
     if (dlg.returnValue !== 'ok') return;
     const ti = p.tailles.length ? Number($('input[name=ti]:checked', dlg)?.value ?? 0) : -1;
-    const vi = p.variantes.length ? Number($('input[name=vi]:checked', dlg)?.value ?? 0) : -1;
+    const vi = variantesDispo.length ? Number($('input[name=vi]:checked', dlg)?.value ?? variantesDispo[0]) : -1;
     ajouter(p.id, ti, vi);
   };
 }

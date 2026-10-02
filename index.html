@@ -4,15 +4,53 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Notre carte — Commander</title>
-  <meta name="theme-color" content="#2b2622">
-  <link rel="stylesheet" href="menu.css?v=2026-10-08">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Poppins:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="menu.css?v=2026-10-11">
 </head>
 <body>
-  <header class="entete">
-    <h1 id="nom-resto">Notre carte</h1>
-    <p id="infos-resto"></p>
-    <p id="accueil"></p>
+  <header class="haut">
+    <div class="haut-ligne">
+      <button class="burger" id="ouvrir-tiroir" aria-label="Menu"><span></span><span></span><span></span></button>
+      <a href="#" class="logo" id="logo" aria-label="Accueil"><span id="nom-resto">Notre carte</span></a>
+      <div class="modes" id="modes" role="radiogroup" aria-label="Mode de commande"></div>
+      <div class="haut-droite">
+        <a class="haut-tel" id="haut-tel" hidden></a>
+        <button class="btn-panier" id="btn-panier" aria-label="Voir mon panier">
+          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM5.2 4l.4 2H21l-2.2 8.2a2 2 0 0 1-1.9 1.5H8.4a2 2 0 0 1-2-1.6L4.4 4H2V2h3.9a1 1 0 0 1 1 .8L7.1 4Z"/></svg>
+          <span class="pastille" id="pastille">0</span>
+        </button>
+        <a href="#carte" class="btn-commander">Commander</a>
+      </div>
+    </div>
   </header>
+
+  <section class="hero" aria-label="À la une">
+    <div class="hero-piste" id="hero-piste"></div>
+    <button class="hero-fleche g" data-hero="-1" aria-label="Précédent" hidden>‹</button>
+    <button class="hero-fleche d" data-hero="1" aria-label="Suivant" hidden>›</button>
+    <div class="hero-points" id="hero-points"></div>
+  </section>
+
+  <section class="bloc" id="bloc-categories">
+    <div class="bloc-titre"><h2>Explorer le menu <span aria-hidden="true">🍗</span></h2><a href="#carte" class="voir-tout">Voir tout →</a></div>
+    <div class="rail-cadre">
+      <button class="rail-fleche g" data-rail="rail-categories" data-sens="-1" aria-label="Précédent">‹</button>
+      <div class="rail" id="rail-categories"></div>
+      <button class="rail-fleche d" data-rail="rail-categories" data-sens="1" aria-label="Suivant">›</button>
+    </div>
+  </section>
+
+  <section class="bloc" id="bloc-vedettes" hidden>
+    <div class="bloc-titre"><h2 id="titre-vedettes">Meilleures offres <span aria-hidden="true">✨</span></h2><a href="#carte" class="voir-tout">Voir tout →</a></div>
+    <div class="rail-cadre">
+      <button class="rail-fleche g" data-rail="rail-vedettes" data-sens="-1" aria-label="Précédent">‹</button>
+      <div class="rail" id="rail-vedettes"></div>
+      <button class="rail-fleche d" data-rail="rail-vedettes" data-sens="1" aria-label="Suivant">›</button>
+    </div>
+  </section>
 
   <nav id="categories" class="categories" aria-label="Catégories"></nav>
 
@@ -20,10 +58,23 @@
     <p class="vide">Chargement de la carte…</p>
   </main>
 
+  <footer class="pied">
+    <strong id="pied-nom"></strong>
+    <p id="infos-resto"></p>
+    <p id="accueil"></p>
+    <p class="petit">Commandes envoyées au restaurant par WhatsApp.</p>
+  </footer>
+
   <button id="barre-panier" class="barre-panier" hidden>
     <span>🛒 Voir mon panier · <span id="nb-articles">0</span> article(s)</span>
     <strong id="total-barre">0,00 DH</strong>
   </button>
+
+  <!-- Menu latéral -->
+  <dialog id="tiroir" class="tiroir">
+    <div class="feuille-entete"><h2>Menu</h2><button type="button" class="fermer" data-fermer-tiroir aria-label="Fermer">✕</button></div>
+    <nav id="tiroir-liens"></nav>
+  </dialog>
 
   <!-- Choix du prix / de la variante -->
   <dialog id="options" class="feuille">
@@ -78,7 +129,7 @@
   </dialog>
 
   <script src="firebase-config.js?v=2026-10-06"></script>
-  <script src="menu-commun.js?v=2026-10-10"></script>
-  <script src="menu.js?v=2026-10-10"></script>
+  <script src="menu-commun.js?v=2026-10-11"></script>
+  <script src="menu.js?v=2026-10-11"></script>
 </body>
 </html>

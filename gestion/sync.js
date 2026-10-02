@@ -12,7 +12,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, connectAuthEmulator,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import {
-  initializeFirestore, connectFirestoreEmulator, collection, doc, getDocs, onSnapshot, writeBatch, setDoc, serverTimestamp,
+  initializeFirestore, connectFirestoreEmulator, collection, doc, getDocs, onSnapshot, writeBatch, setDoc, deleteDoc, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 
 const conf = window.JGUIRO_SYNC || {};
@@ -25,6 +25,7 @@ const ORDONNES = new Set(['carte', 'tables']);          // l'ordre d'affichage c
 const PUBLICS = new Set(['carte', 'tables', 'restaurant', 'menuEnLigne']); // utilisés par la carte en ligne
 const CLE_DERNIER = 'jguiro-sync-dernier';               // empreintes du dernier état synchronisé
 const CLE_APPAREIL = 'jguiro-appareil';
+const CLE_PHOTOS = 'jguiro-photos-envoyees';                // photos déjà publiées depuis cet appareil
 
 /* ---------- Outils ---------- */
 
@@ -171,6 +172,29 @@ async function pousser() {
 async function publierCarte() {
   const carte = construireMenuPublic(app.donnees());
   await setDoc(doc(fs, 'publics', rid), { json: JSON.stringify(carte), maj: serverTimestamp() });
+  await publierPhotos();
+}
+
+// Chaque photo est un document public séparé (une photo ne change jamais : une nouvelle photo = un nouvel identifiant)
+async function publierPhotos() {
+  const utiles = photosReferencees(app.donnees());
+  const envoyees = new Set(lireStockage(CLE_PHOTOS) || []);
+  const sauverEnvoyees = () => { try { localStorage.setItem(CLE_PHOTOS, JSON.stringify([...envoyees])); } catch (e) { /* plein */ } };
+  try {
+    for (const id of utiles) {
+      const data = app.photo(id);
+      if (envoyees.has(id) || !data) continue;
+      await setDoc(doc(fs, 'publics', idDocPhoto(rid, id)), { data, maj: serverTimestamp() });
+      envoyees.add(id);
+    }
+    for (const id of [...envoyees]) {
+      if (utiles.has(id)) continue;
+      await deleteDoc(doc(fs, 'publics', idDocPhoto(rid, id)));
+      envoyees.delete(id);
+    }
+  } finally {
+    sauverEnvoyees();
+  }
 }
 
 /* ---------- Réception des changements des autres appareils ---------- */
@@ -224,6 +248,7 @@ function ecouter() {
       sauverDernier();
       app.ecrireLocal();
       app.rafraichir();
+      app.completerPhotos();
     }
     if (etat.statut !== 'envoi' && etat.statut !== 'erreur') {
       majEtat({ statut: snap.metadata.fromCache ? 'hors_ligne' : 'ok', derniere: snap.metadata.fromCache ? etat.derniere : new Date().toISOString() });
@@ -261,6 +286,8 @@ async function demarrer() {
   reconcilier(distant);
   await pousser();
   ecouter();
+  app.completerPhotos();
+  publierPhotos().catch(() => {}); // photos qui n'avaient pas pu être envoyées
 }
 
 function messageErreur(e) {

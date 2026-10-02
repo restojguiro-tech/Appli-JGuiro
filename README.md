@@ -52,6 +52,15 @@ Les données sont enregistrées **dans le navigateur** (localStorage) de l'appar
 
 À refaire (étape 2) après chaque modification de la carte.
 
+### Apparence de la carte (vitrine)
+
+La page d'accueil se présente comme un site de commande : en-tête avec Livraison / À emporter / Sur place et panier,
+grandes bannières qui défilent, rubrique « Explorer le menu » (une vignette par catégorie), « Meilleures offres », puis toute la carte en fiches avec photos.
+
+- **Menu en ligne → Apparence** : couleur principale, logo, bannières (image, titre, texte, catégorie visée) et photos des catégories.
+- **Carte → Modifier** un plat : photo, description courte, case « ⭐ À la une » (rubrique « Meilleures offres » ; sans plat coché, les plus vendus des 60 derniers jours sont affichés).
+- Les photos sont réduites automatiquement, gardées dans le navigateur (IndexedDB) et, avec la synchronisation, publiées dans des documents séparés `publics/jguiro__photo__…` (lisibles par tous, comme la carte). Elles sont incluses dans l'export de sauvegarde et dans le fichier `menu.json`.
+
 `vendor/qrcode.js` : QR Code Generator for JavaScript, © 2009 Kazuhiko Arase, licence MIT.
 
 ## Synchronisation entre appareils (Firebase)

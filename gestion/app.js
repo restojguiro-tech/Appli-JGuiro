@@ -97,6 +97,109 @@ function copieSecurite(raison) {
   } catch (e) { /* stockage plein : on ne bloque pas l'opération */ }
 }
 
+/* ---------- Photos (gardées à part, dans IndexedDB) ---------- */
+
+const photos = new Map(); // id → image (data URL)
+const srcPhoto = id => (id && photos.get(id)) || '';
+
+async function chargerPhotosLocales() {
+  (await PhotosLocales.tout()).forEach((v, k) => photos.set(k, v));
+  // Photos d'un ancien essai jamais enregistré : on fait le ménage
+  const utiles = photosReferencees(db);
+  photos.forEach((_, id) => { if (!utiles.has(id)) { photos.delete(id); PhotosLocales.supprimer(id); } });
+  await completerPhotos();
+  rafraichir();
+}
+
+// Photos ajoutées sur un autre appareil : on les récupère en ligne
+let completionEnCours = false;
+async function completerPhotos() {
+  const manquantes = [...photosReferencees(db)].filter(id => !photos.has(id));
+  if (!manquantes.length || completionEnCours || !window.JGUIRO_SYNC?.firebase) return;
+  completionEnCours = true;
+  try {
+    for (let i = 0; i < manquantes.length; i += 100) {
+      const recues = await photosEnLigne(manquantes.slice(i, i + 100));
+      for (const [id, data] of recues) { photos.set(id, data); await PhotosLocales.mettre(id, data); }
+    }
+  } catch (e) { /* hors ligne : on réessaiera */ } finally { completionEnCours = false; }
+}
+
+// Réduit une photo (taille et poids) avant de la garder
+async function compresserImage(fichier, largeurMax, hauteurMax, transparence = false) {
+  const url = URL.createObjectURL(fichier);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const r = Math.min(1, largeurMax / img.naturalWidth, hauteurMax / img.naturalHeight);
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * r);
+    c.height = Math.round(img.naturalHeight * r);
+    const ctx = c.getContext('2d');
+    if (!transparence) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    let data = c.toDataURL('image/webp', 0.8);
+    if (!data.startsWith('data:image/webp')) data = transparence ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.8);
+    return data;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+const FORMATS_PHOTO = {
+  plat: [800, 800, false], categorie: [600, 600, false], banniere: [1600, 700, false], logo: [500, 200, true],
+};
+
+async function nouvellePhoto(fichier, format) {
+  let data;
+  try {
+    data = await compresserImage(fichier, ...FORMATS_PHOTO[format]);
+  } catch (e) {
+    alert("Cette image n'a pas pu être lue. Essayez une photo au format JPG ou PNG.");
+    return null;
+  }
+  const id = uid();
+  photos.set(id, data);
+  try { await PhotosLocales.mettre(id, data); } catch (e) { alert("La photo n'a pas pu être enregistrée sur cet appareil."); return null; }
+  return id;
+}
+
+// Champ photo des formulaires : aperçu + boutons ; la valeur (identifiant) est dans un champ caché
+function champPhoto(nom, id, format, libelle = 'Photo') {
+  return `
+    <div class="champ-photo" data-format="${format}">
+      <span class="muted">${libelle}</span>
+      <div class="cp-ligne">
+        <div class="cp-apercu ${format}">${id && srcPhoto(id) ? `<img src="${srcPhoto(id)}" alt="">` : '<span>Aucune photo</span>'}</div>
+        <div class="cp-boutons">
+          <label class="btn small">📷 ${id ? 'Changer' : 'Ajouter une photo'}<input type="file" accept="image/*" class="cp-fichier" hidden></label>
+          <button type="button" class="btn small danger cp-retirer" ${id ? '' : 'hidden'}>Retirer</button>
+        </div>
+      </div>
+      <input type="hidden" name="${nom}" value="${esc(id || '')}">
+    </div>`;
+}
+
+document.addEventListener('change', async e => {
+  const champ = e.target.closest('.champ-photo');
+  if (!champ || !e.target.classList.contains('cp-fichier') || !e.target.files[0]) return;
+  const id = await nouvellePhoto(e.target.files[0], champ.dataset.format);
+  e.target.value = '';
+  if (!id) return;
+  $('input[type=hidden]', champ).value = id;
+  $('.cp-apercu', champ).innerHTML = `<img src="${srcPhoto(id)}" alt="">`;
+  $('.cp-retirer', champ).hidden = false;
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest('.cp-retirer');
+  if (!b) return;
+  const champ = b.closest('.champ-photo');
+  $('input[type=hidden]', champ).value = '';
+  $('.cp-apercu', champ).innerHTML = '<span>Aucune photo</span>';
+  b.hidden = true;
+});
+
 // Enregistre sur cet appareil puis envoie les changements aux autres appareils (si la synchronisation est active)
 function sauver() {
   ecrireLocal();
@@ -384,7 +487,7 @@ vues.carte = () => `
         <tr><th>Nom</th><th class="num">Prix</th><th>Statut</th><th></th></tr>
         ${db.carte.filter(p => p.categorie === cat).map(p => `
           <tr>
-            <td>${esc(p.nom)}
+            <td><div class="plat-titre">${srcPhoto(p.photo) ? `<img class="vignette" src="${srcPhoto(p.photo)}" alt="">` : ''}<span>${p.vedette ? '<span title="À la une">⭐</span> ' : ''}${esc(p.nom)}</span></div>
               ${groupesDe(p).length ? groupesDe(p).map(g => {
                 const ts = taillesDe(p).filter(t => t.groupe === g);
                 const epuise = ts.every(t => t.disponible === false);
@@ -424,6 +527,9 @@ function formPlat(p = {}) {
   return `
     <label>Nom<input name="nom" required value="${esc(p.nom)}"></label>
     <label>Catégorie<input name="categorie" required list="liste-cat" value="${esc(p.categorie)}"></label>
+    ${champPhoto('photo', p.photo, 'plat', 'Photo (visible sur la carte en ligne)')}
+    <label>Description courte (facultatif)<input name="description" maxlength="140" placeholder="Ex. : Poulet braisé, attiéké et sauce piment" value="${esc(p.description)}"></label>
+    <label><input type="checkbox" name="vedette" style="width:auto" ${p.vedette ? 'checked' : ''}> ⭐ À la une (rubrique « Meilleures offres » de la carte en ligne)</label>
     <fieldset class="variantes">
       <legend>Prix (DH) — et sous-menus si besoin (ex. : Poulet → Frit, Sauté, Choukouya…)</legend>
       <div id="liste-groupes">${groupes.map(groupePrix).join('')}</div>
@@ -498,7 +604,8 @@ function lirePlat(d) {
   if (!prixListe.length) { alert('Indiquez au moins un prix.'); return null; }
   const avecSousMenus = prixListe.some(t => t.groupe);
   return { nom: d.nom.trim(), categorie: d.categorie.trim(), prix: Math.min(...prixListe.map(l => l.prix)),
-    disponible: d.disponible, variantes: lireVariantes(), tailles: prixListe.length > 1 || avecSousMenus ? prixListe : [] };
+    disponible: d.disponible, variantes: lireVariantes(), tailles: prixListe.length > 1 || avecSousMenus ? prixListe : [],
+    photo: d.photo || '', description: (d.description || '').trim(), vedette: !!d.vedette };
 }
 
 function ajouterLigne(plat, taille, variante) {
@@ -1012,7 +1119,8 @@ const actions = {
 
   /* Paramètres */
   'exporter': () => {
-    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const photosUtiles = Object.fromEntries([...photosReferencees(db)].filter(id => photos.has(id)).map(id => [id, photos.get(id)]));
+    const blob = new Blob([JSON.stringify({ ...db, photos: photosUtiles }, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `sauvegarde-restaurant-${aujourdHui()}.json`;
@@ -1084,13 +1192,18 @@ document.addEventListener('change', e => {
     case 'importer': {
       const fichier = el.files[0];
       if (!fichier) return;
-      fichier.text().then(txt => {
+      fichier.text().then(async txt => {
         const data = JSON.parse(txt);
         if (!Array.isArray(data.carte) || !Array.isArray(data.commandes)) throw new Error('format inattendu');
         if (!confirmer(syncEtat.connecte
           ? 'Remplacer toutes les données par celles du fichier, sur TOUS les appareils synchronisés ?'
           : 'Remplacer toutes les données actuelles par celles du fichier ?')) return;
         copieSecurite('avant import');
+        for (const [id, img] of Object.entries(data.photos || {})) {
+          photos.set(id, img);
+          await PhotosLocales.mettre(id, img).catch(() => {});
+        }
+        delete data.photos;
         db = migrer(data);
         sauver(); rendre();
         window.syncApi?.envoyerMaintenant();
@@ -2097,6 +2210,7 @@ vues.menuenligne = () => {
         </ol>
       </div>
     </div>
+    ${carteApparence()}
     <div class="card" style="margin-top:16px">
       <h2>4. Partager avec vos clients</h2>
       <div class="partage">
@@ -2114,6 +2228,121 @@ vues.menuenligne = () => {
       </div>
     </div>`;
 };
+
+/* ---------- Apparence de la carte en ligne (couleur, logo, bannières, photos) ---------- */
+
+const COULEUR_DEFAUT = '#d62828';
+
+function carteApparence() {
+  const cfg = db.menuEnLigne;
+  const bannieres = cfg.bannieres || [];
+  const photosCat = cfg.photosCategories || {};
+  return `
+    <div class="card" style="margin-top:16px">
+      <h2>🎨 Apparence de la carte en ligne</h2>
+      <div class="grid cols-2">
+        <form id="form-apparence">
+          <label>Couleur principale (boutons, prix, titres)
+            <input type="color" name="couleur" value="${esc(cfg.couleur || COULEUR_DEFAUT)}" style="height:44px;padding:4px"></label>
+          ${champPhoto('logo', cfg.logo, 'logo', 'Logo (facultatif — sinon le nom du restaurant est affiché)')}
+          <button class="btn primary" type="submit">Enregistrer</button>
+        </form>
+        <div>
+          <p style="margin-top:0"><strong>Bannières</strong> <span class="muted">— grandes images qui défilent en haut de la carte</span></p>
+          ${bannieres.length ? bannieres.map((b, i) => `
+            <div class="banniere-ligne">
+              <div class="cp-apercu banniere">${srcPhoto(b.photo) ? `<img src="${srcPhoto(b.photo)}" alt="">` : '<span>Sans photo</span>'}</div>
+              <div class="bl-texte"><strong>${esc(b.titre || 'Sans titre')}</strong><span class="muted small-note">${esc(b.texte || '')}${b.categorie ? ` → ${esc(b.categorie)}` : ''}</span></div>
+              <div class="bl-boutons">
+                <button class="btn small" data-action="monter-banniere" data-i="${i}" title="Monter" ${i === 0 ? 'disabled' : ''}>↑</button>
+                <button class="btn small" data-action="modifier-banniere" data-i="${i}">Modifier</button>
+                <button class="btn small danger" data-action="supprimer-banniere" data-i="${i}" title="Supprimer">✕</button>
+              </div>
+            </div>`).join('') : '<p class="muted small-note">Aucune bannière : un bandeau avec le nom du restaurant et le message d\'accueil est affiché.</p>'}
+          ${bannieres.length < 6 ? '<button class="btn small" data-action="ajouter-banniere">+ Ajouter une bannière</button>' : ''}
+          <p class="muted small-note">Conseil : photo horizontale (format paysage), avec le plat bien visible au centre.</p>
+        </div>
+      </div>
+      <p><strong>Photos des catégories</strong> <span class="muted">— rubrique « Explorer le menu »</span></p>
+      <div class="photos-cat">
+        ${categories().map(c => `
+          <div class="photo-cat">
+            <div class="cp-apercu categorie">${srcPhoto(photosCat[c]) ? `<img src="${srcPhoto(photosCat[c])}" alt="">` : '<span>Aucune photo</span>'}</div>
+            <strong>${esc(c)}</strong>
+            <div class="row" style="gap:6px;justify-content:center">
+              <label class="btn small" style="margin:0">📷<input type="file" accept="image/*" hidden data-photo-cat="${esc(c)}"></label>
+              ${photosCat[c] ? `<button class="btn small danger" data-action="retirer-photo-cat" data-cat="${esc(c)}" title="Retirer la photo">✕</button>` : ''}
+            </div>
+          </div>`).join('')}
+      </div>
+      <p class="muted small-note">Les photos des plats s'ajoutent dans <a href="#carte">Carte</a> → Modifier.
+        Pour les « Meilleures offres », cochez « ⭐ À la une » sur les plats choisis (sinon, les plats les plus vendus sont affichés).</p>
+    </div>`;
+}
+
+function formBanniere(b = {}) {
+  return `
+    ${champPhoto('photo', b.photo, 'banniere', 'Image')}
+    <label>Titre (facultatif)<input name="titre" maxlength="40" placeholder="Ex. : Poulet braisé" value="${esc(b.titre)}"></label>
+    <label>Texte (facultatif)<input name="texte" maxlength="90" placeholder="Ex. : Avec attiéké ou alloco, dès 60 DH" value="${esc(b.texte)}"></label>
+    <label>Le bouton « Commander maintenant » mène à
+      <select name="categorie"><option value="">Toute la carte</option>${optionsHtml(categories(), b.categorie)}</select></label>`;
+}
+
+function lireBanniere(d) {
+  if (!d.photo && !d.titre.trim()) { alert('Ajoutez une image ou un titre.'); return null; }
+  return { photo: d.photo, titre: d.titre.trim(), texte: d.texte.trim(), categorie: d.categorie };
+}
+
+Object.assign(actions, {
+  'ajouter-banniere': () => ouvrirModal('Nouvelle bannière', formBanniere(), d => {
+    const b = lireBanniere(d);
+    if (!b) return false;
+    (db.menuEnLigne.bannieres ||= []).push({ id: uid(), ...b });
+  }),
+  'modifier-banniere': el => {
+    const b = db.menuEnLigne.bannieres[el.dataset.i];
+    ouvrirModal('Modifier la bannière', formBanniere(b), d => {
+      const n = lireBanniere(d);
+      if (!n) return false;
+      Object.assign(b, n);
+    });
+  },
+  'monter-banniere': el => {
+    const l = db.menuEnLigne.bannieres;
+    const i = Number(el.dataset.i);
+    [l[i - 1], l[i]] = [l[i], l[i - 1]];
+    sauver(); rendre();
+  },
+  'supprimer-banniere': el => {
+    if (!confirmer('Supprimer cette bannière ?')) return;
+    db.menuEnLigne.bannieres.splice(Number(el.dataset.i), 1);
+    sauver(); rendre();
+  },
+  'retirer-photo-cat': el => {
+    delete db.menuEnLigne.photosCategories?.[el.dataset.cat];
+    sauver(); rendre();
+  },
+});
+
+document.addEventListener('change', async e => {
+  const cat = e.target.dataset?.photoCat;
+  if (cat == null || !e.target.files[0]) return;
+  const id = await nouvellePhoto(e.target.files[0], 'categorie');
+  if (!id) return;
+  (db.menuEnLigne.photosCategories ||= {})[cat] = id;
+  sauver(); rendre();
+});
+
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'form-apparence') return;
+  e.preventDefault();
+  const d = Object.fromEntries(new FormData(e.target));
+  db.menuEnLigne.couleur = /^#[0-9a-f]{6}$/i.test(d.couleur) ? d.couleur : '';
+  db.menuEnLigne.logo = d.logo || '';
+  sauver(); rendre();
+  alert('Apparence enregistrée.');
+});
 
 function creerCommandeExterne(type, client) {
   const jour = aujourdHui();
@@ -2175,7 +2404,8 @@ async function recupererCartePubliee() {
 
   db.carte = m.plats.map(p => ({
     id: p.id, nom: p.nom, categorie: p.categorie, prix: Number(p.prix), disponible: true,
-    tailles: (p.tailles || []).map(t => ({ nom: t.nom || '', prix: Number(t.prix) })),
+    ...(p.photo ? { photo: p.photo } : {}), ...(p.description ? { description: p.description } : {}),
+    tailles: (p.tailles || []).map(t => ({ nom: t.nom || '', prix: Number(t.prix), ...(t.groupe ? { groupe: t.groupe } : {}) })),
     variantes: (p.variantes || []).map(v => ({ nom: v.nom, supplement: Number(v.supplement) || 0 })),
   }));
   ['nom', 'adresse', 'telephone'].forEach(k => { if (m.restaurant?.[k]) db.restaurant[k] = m.restaurant[k]; });
@@ -2190,7 +2420,9 @@ async function recupererCartePubliee() {
   });
   if (Array.isArray(m.modes)) db.menuEnLigne.modes = Object.fromEntries(Object.keys(MODES).map(k => [k, m.modes.includes(k)]));
   if (Array.isArray(m.paiements)) db.menuEnLigne.paiements = Object.fromEntries(Object.keys(MENU_PAIEMENTS).map(k => [k, m.paiements.includes(k)]));
+  Object.entries(m.photos || {}).forEach(([id, img]) => { photos.set(id, img); PhotosLocales.mettre(id, img).catch(() => {}); });
   sauver(); rendre();
+  completerPhotos().then(rafraichir);
   alert(`Carte mise à jour : ${db.carte.length} plats.`);
 }
 
@@ -2210,7 +2442,9 @@ Object.assign(actions, {
   'recuperer-carte': recupererCartePubliee,
   'telecharger-menu': () => {
     if (!db.menuEnLigne.whatsapp) return alert("Indiquez d'abord le numéro WhatsApp du restaurant dans les réglages.");
-    const blob = new Blob([JSON.stringify(construireMenuPublic(db), null, 1)], { type: 'application/json' });
+    const m = construireMenuPublic(db);
+    m.photos = Object.fromEntries([...photosReferencees(db)].filter(id => photos.has(id)).map(id => [id, photos.get(id)]));
+    const blob = new Blob([JSON.stringify(m, null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'menu.json';
@@ -2238,6 +2472,7 @@ document.addEventListener('submit', e => {
   e.preventDefault();
   const d = Object.fromEntries(new FormData(e.target));
   db.menuEnLigne = {
+    ...db.menuEnLigne,
     whatsapp: d.whatsapp.replace(/\D/g, '').replace(/^00/, ''),
     accueil: d.accueil.trim(),
     lienCourt: d.lienCourt.trim(),
@@ -2356,6 +2591,8 @@ function demanderChoixSync(nbEnLigne) {
 
 window.app = {
   donnees: () => db,
+  photo: id => photos.get(id),
+  completerPhotos: () => completerPhotos().then(rafraichir),
   copieSecurite,
   ecrireLocal,
   rafraichir,
@@ -2418,3 +2655,4 @@ window.addEventListener('hashchange', () => {
   rendre();
 });
 rendre();
+chargerPhotosLocales();

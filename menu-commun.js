@@ -28,10 +28,99 @@ function trierCategories(categories) {
   return categories.map((c, i) => ({ c, i })).sort((a, b) => rang(a.c) - rang(b.c) || a.i - b.i).map(x => x.c);
 }
 
+/* ---------- Photos (plats, catégories, bannières, logo) ----------
+   Gardées dans ce navigateur (IndexedDB, sans limite de place gênante) et publiées en ligne
+   dans des documents séparés publics/{restaurant}__photo__{id}, lisibles par tous. */
+
+const PhotosLocales = {
+  _base: null,
+  _ouvrir() {
+    if (!this._base) {
+      this._base = new Promise((ok, ko) => {
+        const r = indexedDB.open('jguiro-photos', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('photos');
+        r.onsuccess = () => ok(r.result);
+        r.onerror = () => ko(r.error);
+      });
+    }
+    return this._base;
+  },
+  async _magasin(mode) {
+    return (await this._ouvrir()).transaction('photos', mode).objectStore('photos');
+  },
+  async tout() {
+    const m = new Map();
+    try {
+      const st = await this._magasin('readonly');
+      await new Promise((ok, ko) => {
+        const r = st.openCursor();
+        r.onsuccess = () => { const c = r.result; if (!c) return ok(); m.set(c.key, c.value); c.continue(); };
+        r.onerror = () => ko(r.error);
+      });
+    } catch (e) { /* navigation privée : pas de photos locales */ }
+    return m;
+  },
+  async mettre(id, data) {
+    const st = await this._magasin('readwrite');
+    await new Promise((ok, ko) => { const r = st.put(data, id); r.onsuccess = ok; r.onerror = () => ko(r.error); });
+  },
+  async supprimer(id) {
+    try {
+      const st = await this._magasin('readwrite');
+      await new Promise(ok => { const r = st.delete(id); r.onsuccess = ok; r.onerror = ok; });
+    } catch (e) { /* ignoré */ }
+  },
+};
+
+// Identifiants des photos utilisées par les données du restaurant
+function photosReferencees(d) {
+  const cfg = d.menuEnLigne || {};
+  return new Set([
+    ...(d.carte || []).map(p => p.photo),
+    cfg.logo,
+    ...(cfg.bannieres || []).map(b => b.photo),
+    ...Object.values(cfg.photosCategories || {}),
+  ].filter(Boolean));
+}
+
+const idDocPhoto = (rid, id) => `${rid || 'jguiro'}__photo__${id}`;
+
+// Lit des photos publiées en ligne (une seule requête pour toutes) : id → image
+async function photosEnLigne(ids) {
+  const sync = window.JGUIRO_SYNC;
+  const res = new Map();
+  if (!sync?.firebase || !ids.length) return res;
+  const base = sync.emulateur ? `http://${sync.emulateur.firestore}/v1` : 'https://firestore.googleapis.com/v1';
+  const racine = `projects/${sync.firebase.projectId}/databases/(default)/documents`;
+  const r = await fetch(`${base}/${racine}:batchGet?key=${sync.firebase.apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ documents: ids.map(id => `${racine}/publics/${idDocPhoto(sync.restaurantId, id)}`) }),
+  });
+  if (!r.ok) return res;
+  (await r.json()).forEach(x => {
+    const data = x.found?.fields?.data?.stringValue;
+    if (data) res.set(x.found.name.split('__photo__').pop(), data);
+  });
+  return res;
+}
+
+// Plats les plus vendus ces 60 derniers jours (pour « Meilleures offres » quand aucun plat n'est mis à la une)
+function platsLesPlusVendus(d, nb = 8) {
+  const depuis = new Date(Date.now() - 60 * 864e5).toISOString();
+  const qte = new Map();
+  (d.commandes || []).filter(c => c.statut === 'payee' && (c.payeeLe || '') >= depuis)
+    .forEach(c => (c.lignes || []).forEach(l => { if (l.platId) qte.set(l.platId, (qte.get(l.platId) || 0) + Number(l.qte || 1)); }));
+  return [...qte].sort((a, b) => b[1] - a[1]).map(x => x[0]);
+}
+
 // Construit la carte publique (sans prix d'achat, stock, ventes…) à partir des données du restaurant.
 function construireMenuPublic(d) {
   const cfg = d.menuEnLigne || {};
   const plats = (d.carte || []).filter(p => p.disponible !== false);
+  const ids = new Set(plats.map(p => p.id));
+  const categories = trierCategories([...new Set(plats.map(p => p.categorie))]);
+  const aLaUne = plats.filter(p => p.vedette).map(p => p.id);
   return {
     format: 1,
     genereLe: new Date().toISOString(),
@@ -43,9 +132,18 @@ function construireMenuPublic(d) {
     paiements: paiementsActifs(cfg),
     lienPaiement: cfg.lienPaiement || '',
     tables: (d.tables || []).map(t => t.nom),
-    categories: trierCategories([...new Set(plats.map(p => p.categorie))]),
+    categories,
+    couleur: cfg.couleur || '',
+    logo: cfg.logo || '',
+    bannieres: (cfg.bannieres || []).filter(b => b.photo || b.titre)
+      .map(b => ({ photo: b.photo || '', titre: b.titre || '', texte: b.texte || '', categorie: categories.includes(b.categorie) ? b.categorie : '' })),
+    photosCategories: Object.fromEntries(Object.entries(cfg.photosCategories || {}).filter(([c, id]) => id && categories.includes(c))),
+    vedettes: aLaUne.length ? aLaUne : platsLesPlusVendus(d).filter(id => ids.has(id)).slice(0, 8),
+    vedettesAuto: !aLaUne.length,
     plats: plats.map(p => ({
       id: p.id, nom: p.nom, categorie: p.categorie, prix: Number(p.prix),
+      ...(p.photo ? { photo: p.photo } : {}),
+      ...(p.description ? { description: p.description } : {}),
       tailles: (p.tailles || []).map(t => ({
         nom: t.nom || '', prix: Number(t.prix),
         ...(t.groupe ? { groupe: t.groupe } : {}),

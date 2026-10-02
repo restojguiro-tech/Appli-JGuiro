@@ -64,49 +64,204 @@ function sauverPanier() {
   try { sessionStorage.setItem(CLE_PANIER, JSON.stringify(panier)); } catch (e) { /* navigation privée */ }
 }
 
-/* ---------- Affichage de la carte ---------- */
+/* ---------- Photos ---------- */
 
-function rendreCarte() {
+const photos = new Map(); // id → image
+
+// Icône de remplacement selon le nom de la catégorie ou du plat
+function icone(texte) {
+  const t = String(texte || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const regles = [
+    [/poulet|chicken|aile|choukouya|braise/, '🍗'], [/poisson|sole|saumon|tilapia|capitaine|thon/, '🐟'],
+    [/crevette|fruits? de mer|calamar/, '🦐'], [/boeuf|viande|entrecote|steak|mouton|agneau|brochette/, '🥩'],
+    [/burger/, '🍔'], [/pizza/, '🍕'], [/frite|alloco|banane|plantain/, '🍟'], [/attieke|riz|garba|foutou|placali|sauce|plat/, '🍛'],
+    [/salade|entree/, '🥗'], [/soupe/, '🍲'], [/supplement|accompagnement/, '🥔'], [/jus|bissap|gingembre/, '🧃'],
+    [/cafe|the\b/, '☕'], [/vin|biere|cocktail/, '🍹'], [/boisson|eau|soda|coca/, '🥤'],
+    [/dessert|gateau|creme|fondant|glace|patisserie/, '🍰'], [/sandwich|wrap|chawarma|tacos/, '🌯'],
+  ];
+  return (regles.find(([re]) => re.test(t)) || [, '🍽️'])[1];
+}
+
+// Image (remplie dès que la photo est chargée) ou visuel de remplacement
+function visuel(idPhoto, texte, clair = false) {
+  const src = idPhoto && photos.get(idPhoto);
+  if (src) return `<img src="${src}" alt="" loading="lazy">`;
+  return `<div class="sans-photo ${clair ? 'clair' : ''}" ${idPhoto ? `data-photo="${esc(idPhoto)}"` : ''} aria-hidden="true">${icone(texte)}</div>`;
+}
+
+async function chargerPhotos() {
+  const ids = [...new Set([
+    menu.logo, ...menu.bannieres.map(b => b.photo), ...Object.values(menu.photosCategories), ...menu.plats.map(p => p.photo),
+  ].filter(Boolean))].filter(id => !photos.has(id));
+  if (!ids.length) return;
+  if (menu.photos) Object.entries(menu.photos).forEach(([id, data]) => photos.set(id, data)); // fichier menu.json
+  if (new URLSearchParams(location.search).has('apercu')) (await PhotosLocales.tout()).forEach((v, k) => photos.set(k, v));
+  const manquantes = ids.filter(id => !photos.has(id));
+  for (let i = 0; i < manquantes.length; i += 100) {
+    try { (await photosEnLigne(manquantes.slice(i, i + 100))).forEach((v, k) => photos.set(k, v)); } catch (e) { /* hors ligne */ }
+  }
+  rendreTout();
+}
+
+/* ---------- Affichage ---------- */
+
+let modeActif = null;
+const CLE_MODE = 'jguiro-mode';
+const ICONES_MODES = { livraison: '🛵', emporter: '🛍️', sur_place: '🍽️' };
+const ORDRE_MODES = ['livraison', 'emporter', 'sur_place'];
+
+const ancre = c => 'cat-' + menu.categories.indexOf(c);
+const taillesDispo = p => p.tailles.filter(t => t.disponible !== false);
+const visible = p => p && !(p.tailles.length && !taillesDispo(p).length); // tout le plat épuisé → caché
+
+function prixAffiche(p) {
+  const ts = taillesDispo(p);
+  if (!ts.length) return dh(p.prix);
+  return `${ts.length > 1 ? '<small>dès </small>' : ''}${dh(Math.min(...ts.map(t => t.prix)))}`;
+}
+
+function detailPlat(p) {
+  if (p.description) return p.description;
+  const ts = taillesDispo(p);
+  const groupes = [...new Set(ts.map(t => t.groupe).filter(Boolean))];
+  return [
+    groupes.length ? groupes.join(' · ') : ts.some(t => t.nom) ? ts.map(t => t.nom).filter(Boolean).join(' · ') : '',
+    p.variantes.filter(v => v.disponible !== false).map(v => v.nom).join(' · '),
+  ].filter(Boolean).join(' — ');
+}
+
+function ficheProduit(p) {
+  const qte = panier.filter(l => l.id === p.id).reduce((s, l) => s + l.qte, 0);
+  const detail = detailPlat(p);
+  return `
+    <article class="produit" data-ajouter="${esc(p.id)}">
+      <div class="visuel">${visuel(p.photo, p.nom + ' ' + p.categorie, true)}</div>
+      ${qte ? `<span class="dans-panier">✓ ${qte} dans le panier</span>` : ''}
+      <div class="corps">
+        <div class="nom">${esc(p.nom)}</div>
+        ${detail ? `<div class="detail">${esc(detail)}</div>` : ''}
+        <div class="bas">
+          <span class="prix">${prixAffiche(p)}</span>
+          <button class="ajouter" aria-label="Ajouter ${esc(p.nom)}">+</button>
+        </div>
+      </div>
+    </article>`;
+}
+
+function rendreEntete() {
   const r = menu.restaurant;
-  document.title = `${r.nom || 'Notre carte'} — Commander`;
-  $('#nom-resto').textContent = r.nom || 'Notre carte';
+  document.title = `${r.nom || 'Notre carte'} — Commander en ligne`;
+  $('#logo').innerHTML = menu.logo && photos.get(menu.logo)
+    ? `<img src="${photos.get(menu.logo)}" alt="${esc(r.nom)}">`
+    : `<span id="nom-resto">${esc(r.nom || 'Notre carte')}</span>`;
+  const modes = ORDRE_MODES.filter(m => menu.modes.includes(m));
+  if (!modes.includes(modeActif)) modeActif = modes[0];
+  $('#modes').innerHTML = modes.map(m => `
+    <button class="mode" role="radio" aria-checked="${m === modeActif}" data-mode="${m}">
+      <span class="ic" aria-hidden="true">${ICONES_MODES[m]}</span>${esc(MENU_MODES[m])}</button>`).join('');
+  const tel = $('#haut-tel');
+  tel.hidden = !r.telephone;
+  if (r.telephone) {
+    tel.href = 'tel:' + r.telephone.replace(/[^\d+]/g, '');
+    tel.innerHTML = `Une question ? Appelez-nous<strong>📞 ${esc(r.telephone)}</strong>`;
+  }
+  $('#pied-nom').textContent = r.nom || '';
   $('#infos-resto').textContent = [r.adresse, r.telephone && `📞 ${r.telephone}`].filter(Boolean).join(' · ');
   $('#accueil').textContent = menu.accueil || '';
+  $('#tiroir-liens').innerHTML = `
+    <a href="#" data-fermer-tiroir>🏠 Accueil</a>
+    <p class="sep">La carte</p>
+    ${menu.categories.map(c => `<a href="#${ancre(c)}" data-fermer-tiroir>${icone(c)} ${esc(c)}</a>`).join('')}
+    <p class="sep">Contact</p>
+    ${r.telephone ? `<a href="tel:${esc(r.telephone.replace(/[^\d+]/g, ''))}">📞 Appeler le restaurant</a>` : ''}
+    ${menu.whatsapp ? `<a href="https://wa.me/${esc(menu.whatsapp)}" target="_blank" rel="noopener">💬 WhatsApp</a>` : ''}
+    ${r.adresse ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.adresse)}" target="_blank" rel="noopener">📍 ${esc(r.adresse)}</a>` : ''}`;
+}
 
-  const ancre = c => 'cat-' + menu.categories.indexOf(c);
+let diapoActive = 0;
+function rendreBandeau() {
+  const r = menu.restaurant;
+  const diapos = menu.bannieres.length ? menu.bannieres : [{ titre: r.nom || 'Notre carte', texte: menu.accueil || 'Commandez en ligne, on s’occupe du reste.' }];
+  $('#hero-piste').innerHTML = diapos.map((b, i) => {
+    const src = b.photo && photos.get(b.photo);
+    const cible = b.categorie ? '#' + ancre(b.categorie) : '#carte';
+    return `
+      <div class="diapo ${src ? 'avec-photo' : ''} ${src && !b.titre && !b.texte ? 'seule-photo' : ''}" role="group" aria-label="${i + 1} sur ${diapos.length}">
+        ${src ? `<img src="${src}" alt="${esc(b.titre)}">` : ''}
+        <div class="texte">
+          ${b.titre ? `<h2>${esc(b.titre)}</h2>` : ''}
+          ${b.texte ? `<p>${esc(b.texte)}</p>` : ''}
+          <a class="cta" href="${cible}">Commander maintenant</a>
+        </div>
+      </div>`;
+  }).join('');
+  const plusieurs = diapos.length > 1;
+  $('#hero-points').innerHTML = plusieurs ? diapos.map((_, i) => `<button data-diapo="${i}" aria-label="Image ${i + 1}"></button>`).join('') : '';
+  $$('.hero-fleche').forEach(b => { b.hidden = !plusieurs; });
+  diapoActive = Math.min(diapoActive, diapos.length - 1);
+  majPoints();
+}
+
+function allerDiapo(i) {
+  const piste = $('#hero-piste');
+  const n = piste.children.length;
+  if (!n) return;
+  diapoActive = (i + n) % n;
+  piste.scrollTo({ left: diapoActive * piste.clientWidth, behavior: 'smooth' });
+  majPoints();
+}
+function majPoints() {
+  $$('#hero-points button').forEach((b, i) => b.setAttribute('aria-current', String(i === diapoActive)));
+}
+
+function rendreRails() {
+  $('#rail-categories').innerHTML = menu.categories.map(c => `
+    <a class="tuile-cat" href="#${ancre(c)}">
+      ${visuel(menu.photosCategories[c], c)}
+      <span>${esc(c)}</span>
+    </a>`).join('');
+  const vedettes = menu.vedettes.map(platDe).filter(visible);
+  $('#bloc-vedettes').hidden = !vedettes.length;
+  $('#titre-vedettes').innerHTML = `${menu.vedettesAuto ? 'Les plus commandés' : 'Meilleures offres'} <span aria-hidden="true">✨</span>`;
+  $('#rail-vedettes').innerHTML = vedettes.map(ficheProduit).join('');
+  majFlechesRails();
+}
+
+function majFlechesRails() {
+  $$('.rail').forEach(rail => {
+    const [g, d] = $$('.rail-fleche', rail.parentElement);
+    g.disabled = rail.scrollLeft <= 4;
+    d.disabled = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 4;
+  });
+}
+
+function rendreCarte() {
   $('#categories').innerHTML = menu.categories.map(c => `<a href="#${ancre(c)}">${esc(c)}</a>`).join('');
-
   if (!menu.plats.length) {
     $('#carte').innerHTML = '<p class="vide">La carte est momentanément indisponible.</p>';
     return;
   }
-  $('#carte').innerHTML = menu.categories.map(c => `
-    <h2 id="${ancre(c)}">${esc(c)}</h2>
-    ${menu.plats.filter(p => p.categorie === c).map(p => {
-      const dansPanier = panier.filter(l => l.id === p.id).reduce((s, l) => s + l.qte, 0);
-      const taillesDispo = p.tailles.filter(t => t.disponible !== false);
-      if (p.tailles.length && !taillesDispo.length) return ''; // tout le plat est épuisé
-      const prix = taillesDispo.length
-        ? `${taillesDispo.length > 1 ? 'dès ' : ''}${dh(Math.min(...taillesDispo.map(t => t.prix)))}`
-        : dh(p.prix);
-      const groupes = [...new Set(taillesDispo.map(t => t.groupe).filter(Boolean))];
-      const detail = [
-        groupes.length ? groupes.join(' · ')
-          : taillesDispo.some(t => t.nom) ? taillesDispo.map(t => t.nom).filter(Boolean).join(' · ') : '',
-        p.variantes.some(v => v.disponible !== false) ? p.variantes.filter(v => v.disponible !== false).map(v => v.nom).join(' · ') : '',
-      ].filter(Boolean).join(' — ');
-      return `
-        <div class="plat">
-          <div class="infos">
-            <div class="nom">${esc(p.nom)}</div>
-            ${detail ? `<div class="detail">${esc(detail)}</div>` : ''}
-            <div class="prix">${prix}</div>
-            ${dansPanier ? `<div class="qte-panier">✓ ${dansPanier} dans le panier</div>` : ''}
-          </div>
-          <button class="ajouter" data-ajouter="${esc(p.id)}" aria-label="Ajouter ${esc(p.nom)}">+</button>
-        </div>`;
-    }).join('')}`).join('');
+  $('#carte').innerHTML = menu.categories.map(c => {
+    const plats = menu.plats.filter(p => p.categorie === c && visible(p));
+    return plats.length ? `<h2 id="${ancre(c)}">${esc(c)}</h2><div class="grille">${plats.map(ficheProduit).join('')}</div>` : '';
+  }).join('');
   majBarre();
+}
+
+function rendreTout() {
+  rendreEntete();
+  rendreBandeau();
+  rendreRails();
+  rendreCarte();
+}
+
+function appliquerCouleur(c) {
+  if (!/^#[0-9a-f]{6}$/i.test(c || '')) return;
+  const r = document.documentElement.style;
+  r.setProperty('--accent', c);
+  r.setProperty('--accent-fonce', `color-mix(in srgb, ${c} 78%, #000)`);
+  r.setProperty('--accent-pale', `color-mix(in srgb, ${c} 9%, #fff)`);
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', '#ffffff');
 }
 
 function majBarre() {
@@ -114,6 +269,7 @@ function majBarre() {
   $('#barre-panier').hidden = nb === 0;
   $('#nb-articles').textContent = nb;
   $('#total-barre').textContent = dh(totalPanier());
+  $('#pastille').textContent = nb;
 }
 
 /* ---------- Ajout au panier (avec choix du prix / de la variante) ---------- */
@@ -123,6 +279,7 @@ function ajouter(id, ti = -1, vi = -1) {
   if (l) l.qte++;
   else panier.push({ id, ti, vi, qte: 1 });
   sauverPanier();
+  rendreRails();
   rendreCarte();
 }
 
@@ -136,6 +293,8 @@ function choisirOptions(p) {
   const avecGroupes = groupes.some(Boolean);
   $('#options-titre').textContent = p.nom;
   $('#options-corps').innerHTML = `
+    ${p.photo && photos.get(p.photo) ? `<div class="options-photo"><img src="${photos.get(p.photo)}" alt=""></div>` : ''}
+    ${p.description ? `<p class="options-desc">${esc(p.description)}</p>` : ''}
     ${avecGroupes && groupes.length > 1 ? `
       <div class="groupe-titre">Choisissez</div>
       <div class="options-liste">
@@ -241,8 +400,9 @@ function rendrePanier() {
 }
 
 function ouvrirPanier() {
+  if (!panier.length) return document.getElementById('carte').scrollIntoView();
   $('#choix-modes').innerHTML = menu.modes.map((m, i) => `
-    <label><input type="radio" name="mode" value="${m}" ${i === 0 ? 'checked' : ''}><span>${MENU_MODES[m]}</span></label>`).join('');
+    <label><input type="radio" name="mode" value="${m}" ${(menu.modes.includes(modeActif) ? m === modeActif : i === 0) ? 'checked' : ''}><span>${MENU_MODES[m]}</span></label>`).join('');
   rendreChampsClient();
   rendrePaiements();
   rendrePanier();
@@ -285,7 +445,7 @@ function envoyer(e) {
   ].filter(l => l !== null).join('\n');
 
   const lienWhatsApp = `https://wa.me/${menu.whatsapp}?text=${encodeURIComponent(message)}`;
-  const viderPanier = () => { panier = []; sauverPanier(); rendreCarte(); };
+  const viderPanier = () => { panier = []; sauverPanier(); rendreRails(); rendreCarte(); };
   $('#panier').close();
 
   if (paiement !== 'en_ligne') {
@@ -319,6 +479,7 @@ document.addEventListener('click', e => {
     panier[i].qte += plus ? 1 : -1;
     if (panier[i].qte <= 0) panier.splice(i, 1);
     sauverPanier();
+    rendreRails();
     rendreCarte();
     if (!panier.length) return $('#panier').close();
     rendrePanier();
@@ -326,14 +487,62 @@ document.addEventListener('click', e => {
   if (e.target.closest('[data-fermer]')) $('#panier').close();
 });
 $('#barre-panier').addEventListener('click', ouvrirPanier);
-$('#choix-modes').addEventListener('change', () => { rendreChampsClient(); rendrePaiements(); rendrePanier(); });
+$('#btn-panier').addEventListener('click', ouvrirPanier);
+$('#choix-modes').addEventListener('change', () => {
+  modeActif = modeChoisi();
+  try { sessionStorage.setItem(CLE_MODE, modeActif); } catch (e) { /* ignoré */ }
+  rendreEntete();
+  rendreChampsClient(); rendrePaiements(); rendrePanier();
+});
+
+// Livraison / À emporter / Sur place en haut de la page
+$('#modes').addEventListener('click', e => {
+  const b = e.target.closest('[data-mode]');
+  if (!b) return;
+  modeActif = b.dataset.mode;
+  try { sessionStorage.setItem(CLE_MODE, modeActif); } catch (err) { /* ignoré */ }
+  rendreEntete();
+});
+
+// Menu latéral
+$('#ouvrir-tiroir').addEventListener('click', () => $('#tiroir').showModal());
+$('#tiroir').addEventListener('click', e => {
+  if (e.target === e.currentTarget || e.target.closest('[data-fermer-tiroir]')) $('#tiroir').close();
+});
+$('#logo').addEventListener('click', e => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+
+// Bandeau : points, flèches, défilement automatique
+let minuteurDiapo = null;
+function relancerDiapos() {
+  clearInterval(minuteurDiapo);
+  minuteurDiapo = setInterval(() => { if (!document.hidden) allerDiapo(diapoActive + 1); }, 6000);
+}
+document.addEventListener('click', e => {
+  const p = e.target.closest('[data-diapo]');
+  const f = e.target.closest('[data-hero]');
+  if (p) { allerDiapo(Number(p.dataset.diapo)); relancerDiapos(); }
+  if (f) { allerDiapo(diapoActive + Number(f.dataset.hero)); relancerDiapos(); }
+  const r = e.target.closest('[data-rail]');
+  if (r) {
+    const rail = document.getElementById(r.dataset.rail);
+    rail.scrollBy({ left: Number(r.dataset.sens) * rail.clientWidth * 0.8, behavior: 'smooth' });
+  }
+});
+$('#hero-piste').addEventListener('scroll', () => {
+  const piste = $('#hero-piste');
+  const i = Math.round(piste.scrollLeft / Math.max(1, piste.clientWidth));
+  if (i !== diapoActive) { diapoActive = i; majPoints(); }
+}, { passive: true });
+$('#hero-piste').addEventListener('pointerdown', relancerDiapos);
+$$('.rail').forEach(r => r.addEventListener('scroll', majFlechesRails, { passive: true }));
+window.addEventListener('resize', majFlechesRails);
 document.addEventListener('click', e => { if (e.target.closest('[data-fermer-conf]')) $('#confirmation').close(); });
 $('#form-panier').addEventListener('submit', envoyer);
 
 // Catégorie active pendant le défilement
 window.addEventListener('scroll', () => {
   let active = null;
-  $$('main h2').forEach(h => { if (h.getBoundingClientRect().top < 120) active = h.id; });
+  $$('main h2').forEach(h => { if (h.getBoundingClientRect().top < 200) active = h.id; });
   $$('#categories a').forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + active));
 }, { passive: true });
 
@@ -341,8 +550,15 @@ chargerMenu()
   .then(m => {
     menu = m;
     menu.categories = trierCategories(menu.categories || []);
+    menu.bannieres = menu.bannieres || [];
+    menu.photosCategories = menu.photosCategories || {};
+    menu.vedettes = menu.vedettes || [];
+    appliquerCouleur(menu.couleur);
     try { panier = JSON.parse(sessionStorage.getItem(CLE_PANIER) || '[]').filter(l => platDe(l.id)); } catch (e) { panier = []; }
-    rendreCarte();
+    try { modeActif = sessionStorage.getItem(CLE_MODE); } catch (e) { /* ignoré */ }
+    rendreTout();
+    relancerDiapos();
+    chargerPhotos();
   })
   .catch(() => {
     $('#carte').innerHTML = '<p class="vide">La carte en ligne n\'est pas encore publiée. Revenez bientôt !</p>';

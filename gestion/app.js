@@ -390,9 +390,9 @@ vues.carte = () => `
                 const epuise = ts.every(t => t.disponible === false);
                 return `<div class="small-note sous-menu"><button class="puce ${epuise ? 'epuisee' : ''}" data-action="basculer-groupe" data-id="${p.id}" data-g="${esc(g)}"
                   title="${epuise ? 'Épuisé — cliquer pour le remettre' : 'Disponible — cliquer pour le marquer épuisé'}">${esc(g)}</button>
-                  <span class="muted">${ts.map(t => esc(dh(t.prix) + (t.nom ? ' ' + t.nom : ''))).join(' · ')}</span></div>`;
+                  <span class="muted">${ts.map(t => `<span class="${t.disponible === false && !epuise ? 'barre' : ''}">${esc(dh(t.prix) + (t.nom ? ' ' + t.nom : ''))}</span>`).join(' · ')}</span></div>`;
               }).join('')
-              : taillesDe(p).length ? `<div class="muted small-note">Prix : ${taillesDe(p).map(t => esc(libellePrix(t))).join(' · ')}</div>` : ''}
+              : taillesDe(p).length ? `<div class="muted small-note">Prix : ${taillesDe(p).map(t => `<span class="${t.disponible === false ? 'barre' : ''}">${esc(libellePrix(t))}</span>`).join(' · ')}</div>` : ''}
               ${variantesDe(p).length ? `<div class="puces-variantes">${variantesDe(p).map((v, i) => `
                 <button class="puce ${v.disponible === false ? 'epuisee' : ''}" data-action="basculer-variante" data-id="${p.id}" data-i="${i}"
                   title="${v.disponible === false ? 'Épuisée — cliquer pour la remettre' : 'Disponible — cliquer pour la marquer épuisée'}">${esc(v.nom)}${esc(fmtSupplement(v))}</button>`).join('')}</div>` : ''}</td>
@@ -413,8 +413,13 @@ function formPlat(p = {}) {
   const groupes = [];
   lignesPrix.forEach(t => {
     let g = groupes.find(x => x.nom === (t.groupe || ''));
-    if (!g) groupes.push(g = { nom: t.groupe || '', disponible: t.disponible !== false, lignes: [] });
+    if (!g) groupes.push(g = { nom: t.groupe || '', lignes: [] });
     g.lignes.push(t);
+  });
+  groupes.forEach(g => {
+    g.disponible = g.lignes.some(t => t.disponible !== false);
+    // Sous-menu entièrement épuisé : les portions s'affichent cochées, c'est la case du sous-menu qui compte
+    if (!g.disponible) g.lignes = g.lignes.map(t => ({ ...t, disponible: true }));
   });
   return `
     <label>Nom<input name="nom" required value="${esc(p.nom)}"></label>
@@ -461,6 +466,7 @@ function lignePrix(t = {}) {
     <div class="prix-row">
       <input class="px-prix" type="number" step="0.01" min="0" placeholder="DH" value="${esc(t.prix ?? '')}">
       <input class="px-nom" placeholder="Portion — ex. : 1/4" title="Précision facultative (ex. : 1/4, 500 g, Grand…)" value="${esc(t.nom)}">
+      <label class="v-dispo-label" title="Décochez si cette portion est épuisée"><input type="checkbox" class="px-dispo" ${t.disponible !== false ? 'checked' : ''}> Dispo</label>
       <button type="button" class="btn small danger" data-action="retirer-prix" title="Retirer ce prix">✕</button>
     </div>`;
 }
@@ -469,7 +475,7 @@ function lirePrix() {
   return $$('#liste-groupes .groupe-prix').flatMap(g => {
     const groupe = $('.gp-nom', g).value.trim();
     const dispo = $('.gp-dispo', g).checked;
-    return $$('.prix-row', g).map(r => ({ groupe, dispo, prix: $('.px-prix', r).value, nom: $('.px-nom', r).value.trim() }));
+    return $$('.prix-row', g).map(r => ({ groupe, dispo: dispo && $('.px-dispo', r).checked, prix: $('.px-prix', r).value, nom: $('.px-nom', r).value.trim() }));
   });
 }
 

@@ -199,7 +199,7 @@ fieldset.variantes legend { color: var(--muted); font-size: .9rem; padding: 0 4p
 /* Plusieurs prix par plat (zone « Prix » du formulaire) */
 .bloc-prix { margin-bottom: 12px; }
 .bloc-label { display: block; font-size: .9rem; color: var(--muted); margin-bottom: 4px; }
-.prix-row { display: grid; grid-template-columns: 90px 1fr 34px; gap: 6px; margin-bottom: 6px; }
+.prix-row { display: grid; grid-template-columns: 90px 1fr auto 34px; gap: 6px; margin-bottom: 6px; align-items: center; }
 .prix-row input { padding: 6px 8px; }
 
 /* Achats & comptabilité */
@@ -269,3 +269,5 @@ details.card summary { cursor: pointer; font-weight: 600; }
 .gp-entete { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; margin-bottom: 6px; }
 .gp-entete .gp-nom { font-weight: 600; }
 .sous-menu { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
+
+.barre { text-decoration: line-through; color: var(--danger); }

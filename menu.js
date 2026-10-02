@@ -340,6 +340,7 @@ window.addEventListener('scroll', () => {
 chargerMenu()
   .then(m => {
     menu = m;
+    menu.categories = trierCategories(menu.categories || []);
     try { panier = JSON.parse(sessionStorage.getItem(CLE_PANIER) || '[]').filter(l => platDe(l.id)); } catch (e) { panier = []; }
     rendreCarte();
   })

@@ -144,7 +144,7 @@ function fmtHeure(iso) {
 
 const totalCommande = c => c.lignes.reduce((s, l) => s + l.prix * l.qte, 0);
 const commandeOuverte = tableId => db.commandes.find(c => c.tableId === tableId && c.statut === 'ouverte');
-const categories = () => [...new Set(db.carte.map(p => p.categorie))];
+const categories = () => trierCategories([...new Set(db.carte.map(p => p.categorie))]);
 const variantesDe = p => p.variantes || [];
 // Un plat peut avoir plusieurs prix (ex. : Sole 100, 120, 130 DH), chacun avec une précision facultative (ex. : 500 g).
 const taillesDe = p => p.tailles || [];

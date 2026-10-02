@@ -20,6 +20,14 @@ const MENU_PAIEMENTS = {
 const paiementsActifs = cfg => Object.keys(MENU_PAIEMENTS)
   .filter(p => (p === 'en_ligne' ? cfg?.paiements?.en_ligne === true && !!cfg?.lienPaiement : cfg?.paiements?.[p] !== false));
 
+// Ordre d'affichage des catégories (les autres catégories viennent ensuite, dans leur ordre d'origine)
+const ORDRE_CATEGORIES = ['plat', 'supplement', 'boisson', 'dessert'];
+function trierCategories(categories) {
+  const cle = c => String(c).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/s$/, '');
+  const rang = c => { const i = ORDRE_CATEGORIES.indexOf(cle(c)); return i < 0 ? ORDRE_CATEGORIES.length : i; };
+  return categories.map((c, i) => ({ c, i })).sort((a, b) => rang(a.c) - rang(b.c) || a.i - b.i).map(x => x.c);
+}
+
 // Construit la carte publique (sans prix d'achat, stock, ventes…) à partir des données du restaurant.
 function construireMenuPublic(d) {
   const cfg = d.menuEnLigne || {};
@@ -35,7 +43,7 @@ function construireMenuPublic(d) {
     paiements: paiementsActifs(cfg),
     lienPaiement: cfg.lienPaiement || '',
     tables: (d.tables || []).map(t => t.nom),
-    categories: [...new Set(plats.map(p => p.categorie))],
+    categories: trierCategories([...new Set(plats.map(p => p.categorie))]),
     plats: plats.map(p => ({
       id: p.id, nom: p.nom, categorie: p.categorie, prix: Number(p.prix),
       tailles: (p.tailles || []).map(t => ({

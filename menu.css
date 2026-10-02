@@ -116,6 +116,7 @@ a { color: inherit; }
   padding: 10px 22px; border: 0; cursor: pointer; box-shadow: 0 4px 0 #0005;
 }
 .diapo.seule-photo .texte { justify-content: flex-end; align-items: flex-end; background: none; }
+.diapo.seule-photo .cta { align-self: auto; }
 .hero-points { position: absolute; left: 0; right: 0; bottom: 14px; display: flex; justify-content: center; gap: 8px; }
 .hero-points button { width: 10px; height: 10px; border-radius: 999px; border: none; background: #fff9; padding: 0; cursor: pointer; transition: width .2s; }
 .hero-points button[aria-current="true"] { width: 24px; background: #fff; }
@@ -334,4 +335,6 @@ input, select, textarea {
   .hero-fleche { display: none; }
   .hero-piste { height: max(240px, 58vw); }
   .diapo .texte { padding: 18px 20px 36px; }
+  .diapo.seule-photo .texte { padding: 0 12px 30px; }
+  .diapo.seule-photo .cta { font-size: .85rem; padding: 7px 12px; }
 }

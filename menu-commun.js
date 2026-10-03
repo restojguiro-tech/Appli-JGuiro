@@ -114,6 +114,55 @@ function platsLesPlusVendus(d, nb = 8) {
   return [...qte].sort((a, b) => b[1] - a[1]).map(x => x[0]);
 }
 
+/* ---------- Livraison : frais selon la distance ---------- */
+
+const TRANCHES_LIVRAISON = [{ max: 3, prix: 20 }, { max: 7, prix: 25 }, { max: 10, prix: 30 }, { max: 12, prix: 40 }];
+const PRIX_LIVRAISON_AU_DELA = 50;
+
+// Prix pour une distance (km) : la première tranche dont la limite n'est pas dépassée, sinon le prix « au-delà »
+function tarifLivraison(km, liv) {
+  const tranches = (liv?.tranches?.length ? liv.tranches : TRANCHES_LIVRAISON).slice().sort((a, b) => a.max - b.max);
+  const t = tranches.find(x => km <= x.max);
+  return t ? { prix: Number(t.prix), majoration: false }
+    : { prix: Number(liv?.auDela ?? PRIX_LIVRAISON_AU_DELA), majoration: true, limite: tranches[tranches.length - 1]?.max };
+}
+
+// Lit « 33.57, -7.59 » ou un lien Google Maps (…@33.57,-7.59… ou …q=33.57,-7.59…)
+function lirePosition(texte) {
+  const m = /(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/.exec(String(texte || ''));
+  if (!m) return null;
+  const lat = Number(m[1]), lng = Number(m[2]);
+  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat: +lat.toFixed(6), lng: +lng.toFixed(6) } : null;
+}
+
+function distanceVolOiseau(a, b) {
+  const r = x => x * Math.PI / 180;
+  const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
+
+// Distance par la route (OpenStreetMap / OSRM) ; à défaut, vol d'oiseau × 1,3
+async function distanceLivraison(a, b) {
+  try {
+    const ctrl = new AbortController();
+    const minuteur = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false`, { signal: ctrl.signal });
+    clearTimeout(minuteur);
+    const km = (await r.json()).routes?.[0]?.distance / 1000;
+    if (km >= 0) return { km, route: true };
+  } catch (e) { /* service indisponible */ }
+  return { km: distanceVolOiseau(a, b) * 1.3, route: false };
+}
+
+// Adresse → position (OpenStreetMap / Nominatim), en privilégiant les environs du restaurant
+async function geocoderAdresse(adresse, pres) {
+  const p = new URLSearchParams({ format: 'jsonv2', limit: '1', countrycodes: 'ma', 'accept-language': 'fr', q: adresse });
+  if (pres) p.set('viewbox', [pres.lng - 0.3, pres.lat + 0.3, pres.lng + 0.3, pres.lat - 0.3].join(','));
+  const r = await fetch('https://nominatim.openstreetmap.org/search?' + p);
+  const x = (await r.json())[0];
+  return x ? { lat: +Number(x.lat).toFixed(6), lng: +Number(x.lon).toFixed(6) } : null;
+}
+
 // Construit la carte publique (sans prix d'achat, stock, ventes…) à partir des données du restaurant.
 function construireMenuPublic(d) {
   const cfg = d.menuEnLigne || {};
@@ -129,6 +178,7 @@ function construireMenuPublic(d) {
     accueil: cfg.accueil || '',
     modes: Object.keys(MENU_MODES).filter(m => cfg.modes?.[m] !== false),
     fraisLivraison: Number(cfg.fraisLivraison) || 0,
+    livraison: cfg.position ? { position: cfg.position, tranches: cfg.tranches?.length ? cfg.tranches : TRANCHES_LIVRAISON, auDela: Number(cfg.auDela ?? PRIX_LIVRAISON_AU_DELA) } : null,
     paiements: paiementsActifs(cfg),
     lienPaiement: cfg.lienPaiement || '',
     tables: (d.tables || []).map(t => t.nom),

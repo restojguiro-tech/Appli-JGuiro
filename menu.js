@@ -361,9 +361,123 @@ function rendreChampsClient() {
     html = `
       <label>Votre nom<input name="nom" required autocomplete="name" value="${esc(valeurs.nom)}"></label>
       <label>Votre téléphone<input name="tel" type="tel" required autocomplete="tel" value="${esc(valeurs.tel)}"></label>
-      ${mode === 'livraison' ? `<label>Adresse de livraison<textarea name="adresse" rows="2" required autocomplete="street-address">${esc(valeurs.adresse)}</textarea></label>` : ''}`;
+      ${mode === 'livraison' ? `<label>Adresse de livraison (quartier, rue, n°, repère)<textarea name="adresse" rows="2" required autocomplete="street-address">${esc(valeurs.adresse)}</textarea></label>
+      ${menu.livraison ? `
+        <div class="livraison-pos">
+          <button type="button" class="btn" data-loc="gps">📍 Utiliser ma position</button>
+          <button type="button" class="btn" data-loc="adresse">🔎 Calculer depuis l'adresse</button>
+        </div>
+        <div id="carte-livraison" class="carte-livraison" hidden></div>
+        <p id="info-livraison" class="info-livraison"></p>` : ''}` : ''}`;
   }
   $('#champs-client').innerHTML = html;
+  if (mode === 'livraison' && menu.livraison) { majInfoLivraison(); if (livraison.pos) afficherCarte(); }
+}
+
+/* ---------- Frais de livraison selon la distance ---------- */
+
+let livraison = { pos: null, km: null, route: false, prix: null, majoration: false, etat: '' }; // etat : '', 'calcul', 'ok', 'erreur'
+let carteLeaflet = null;
+
+function fraisActuels() {
+  if (modeChoisi() !== 'livraison') return 0;
+  if (!menu.livraison) return Number(menu.fraisLivraison) || 0;
+  return livraison.etat === 'ok' ? livraison.prix : 0;
+}
+
+function majInfoLivraison() {
+  const el = document.getElementById('info-livraison');
+  if (!el) return;
+  const l = livraison;
+  el.className = 'info-livraison ' + (l.etat === 'ok' ? 'ok' : l.etat === 'erreur' ? 'erreur' : '');
+  el.innerHTML = l.etat === 'calcul' ? '⏳ Calcul de la distance…'
+    : l.etat === 'ok' ? `🛵 Distance : <strong>${l.km.toFixed(1).replace('.', ',')} km</strong> → frais de livraison <strong>${dh(l.prix)}</strong>
+        ${l.majoration ? '<br>Au-delà de ' + esc(String(tarifLivraison(99, menu.livraison).limite || 12)) + ' km, une majoration peut s\u2019appliquer : le restaurant vous la confirmera.' : ''}
+        <br><span class="petit">Déplacez le repère sur la carte si votre position n'est pas exacte.</span>`
+    : l.etat === 'erreur' ? `⚠️ ${esc(l.message || 'Position introuvable.')}`
+    : 'Indiquez votre position pour calculer les frais de livraison.';
+}
+
+async function calculerLivraison(pos, source) {
+  livraison = { ...livraison, pos, source, etat: 'calcul' };
+  majInfoLivraison();
+  afficherCarte();
+  const { km, route } = await distanceLivraison(menu.livraison.position, pos);
+  if (livraison.pos !== pos) return; // une autre position a été choisie entre-temps
+  livraison = { ...livraison, km, route, ...tarifLivraison(km, menu.livraison), etat: 'ok' };
+  majInfoLivraison();
+  rendrePanier();
+}
+
+function erreurLivraison(message) {
+  livraison = { ...livraison, etat: 'erreur', message };
+  majInfoLivraison();
+  rendrePanier();
+}
+
+function positionGps() {
+  if (!navigator.geolocation) return erreurLivraison("Votre téléphone ne permet pas la localisation : utilisez l'adresse.");
+  livraison = { ...livraison, etat: 'calcul' };
+  majInfoLivraison();
+  navigator.geolocation.getCurrentPosition(
+    p => calculerLivraison({ lat: +p.coords.latitude.toFixed(6), lng: +p.coords.longitude.toFixed(6) }, 'gps'),
+    () => erreurLivraison("Localisation refusée ou impossible : écrivez l'adresse puis « Calculer depuis l'adresse »."),
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+}
+
+async function positionAdresse() {
+  const adresse = ($('#form-panier').elements.adresse?.value || '').trim();
+  if (adresse.length < 4) return erreurLivraison("Écrivez d'abord votre adresse (quartier, rue…).");
+  livraison = { ...livraison, etat: 'calcul' };
+  majInfoLivraison();
+  try {
+    const pos = await geocoderAdresse(adresse, menu.livraison.position);
+    if (!pos) return erreurLivraison('Adresse introuvable sur la carte : précisez le quartier, ou utilisez « Ma position ».');
+    calculerLivraison(pos, 'adresse');
+  } catch (e) {
+    erreurLivraison('Calcul impossible pour le moment : les frais de livraison vous seront confirmés par le restaurant.');
+  }
+}
+
+// Petite carte (OpenStreetMap) avec un repère déplaçable
+function chargerLeaflet() {
+  if (window.L) return Promise.resolve();
+  return new Promise((ok, ko) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+    document.head.appendChild(css);
+    const js = document.createElement('script');
+    js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    js.onload = ok;
+    js.onerror = ko;
+    document.head.appendChild(js);
+  });
+}
+
+async function afficherCarte() {
+  const zone = document.getElementById('carte-livraison');
+  if (!zone || !livraison.pos) return;
+  try { await chargerLeaflet(); } catch (e) { return; }
+  zone.hidden = false;
+  if (carteLeaflet && carteLeaflet.getContainer() !== zone) { carteLeaflet.remove(); carteLeaflet = null; }
+  const { lat, lng } = livraison.pos;
+  if (!carteLeaflet) {
+    carteLeaflet = L.map(zone, { attributionControl: true, zoomControl: true }).setView([lat, lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(carteLeaflet);
+    const r = menu.livraison.position;
+    L.circleMarker([r.lat, r.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#d62828', fillOpacity: 1 })
+      .addTo(carteLeaflet).bindTooltip(menu.restaurant.nom || 'Restaurant');
+    carteLeaflet._repere = L.marker([lat, lng], { draggable: true }).addTo(carteLeaflet);
+    carteLeaflet._repere.on('dragend', ev => {
+      const p = ev.target.getLatLng();
+      calculerLivraison({ lat: +p.lat.toFixed(6), lng: +p.lng.toFixed(6) }, 'repere');
+    });
+  } else {
+    carteLeaflet._repere.setLatLng([lat, lng]);
+    carteLeaflet.setView([lat, lng], Math.max(carteLeaflet.getZoom(), 14));
+  }
+  setTimeout(() => carteLeaflet && carteLeaflet.invalidateSize(), 50);
 }
 
 // Le paiement se fait à table, au retrait ou à la livraison, sauf la carte en ligne
@@ -386,7 +500,8 @@ function rendrePaiements() {
 }
 
 function rendrePanier() {
-  const frais = modeChoisi() === 'livraison' ? menu.fraisLivraison : 0;
+  const frais = fraisActuels();
+  const aCalculer = modeChoisi() === 'livraison' && menu.livraison && livraison.etat !== 'ok';
   $('#lignes-panier').innerHTML = panier.map((l, i) => `
     <div class="ligne-panier">
       <button type="button" class="btn" data-moins="${i}" aria-label="Retirer un">−</button>
@@ -395,7 +510,8 @@ function rendrePanier() {
       <span class="n">${esc(nomLigne(l))}</span>
       <span>${dh(prixLigne(l) * l.qte)}</span>
     </div>`).join('') + (frais ? `
-    <div class="ligne-panier"><span class="n">Frais de livraison</span><span>${dh(frais)}</span></div>` : '');
+    <div class="ligne-panier"><span class="n">Frais de livraison${livraison.etat === 'ok' && menu.livraison ? ` (${livraison.km.toFixed(1).replace('.', ',')} km)` : ''}</span><span>${dh(frais)}</span></div>` : '')
+    + (aCalculer ? `<div class="ligne-panier"><span class="n">Frais de livraison</span><span class="petit">${livraison.etat === 'erreur' ? 'à confirmer' : 'selon la distance'}</span></div>` : '');
   $('#total-panier').textContent = dh(totalPanier() + frais);
 }
 
@@ -419,11 +535,19 @@ function envoyer(e) {
   const f = e.target.elements;
   const mode = modeChoisi();
   const val = n => (f[n]?.value || '').trim();
-  const frais = mode === 'livraison' ? menu.fraisLivraison : 0;
+  if (mode === 'livraison' && menu.livraison && livraison.etat !== 'ok' && livraison.etat !== 'erreur') {
+    alert('Indiquez votre position (bouton « Utiliser ma position » ou « Calculer depuis l\u2019adresse ») pour calculer les frais de livraison.');
+    return;
+  }
+  if (livraison.etat === 'calcul') return;
+  const frais = fraisActuels();
+  const distanceOk = mode === 'livraison' && menu.livraison && livraison.etat === 'ok';
   const paiement = $('input[name=paiement]:checked')?.value || paiementsMenu()[0];
   const total = totalPanier() + frais;
   const lignes = panier.map(l => `• ${l.qte} × ${nomLigne(l)} = ${dh(prixLigne(l) * l.qte)}`);
-  if (frais) lignes.push(`• Frais de livraison = ${dh(frais)}`);
+  if (frais) lignes.push(`• Frais de livraison${distanceOk ? ` (${livraison.km.toFixed(1).replace('.', ',')} km)` : ''} = ${dh(frais)}`);
+  if (distanceOk && livraison.majoration) lignes.push('  (au-delà de la zone : majoration possible, à confirmer)');
+  if (mode === 'livraison' && menu.livraison && !distanceOk) lignes.push('• Frais de livraison : à confirmer par le restaurant');
   const message = [
     `🧾 *Nouvelle commande — ${menu.restaurant.nom}*`,
     `Mode : *${MENU_MODES[mode]}*`,
@@ -431,6 +555,7 @@ function envoyer(e) {
     val('nom') ? `Nom : ${val('nom')}` : null,
     val('tel') ? `Téléphone : ${val('tel')}` : null,
     val('adresse') ? `Adresse : ${val('adresse')}` : null,
+    mode === 'livraison' && livraison.pos ? `📍 Position : https://maps.google.com/?q=${livraison.pos.lat},${livraison.pos.lng}` : null,
     '',
     ...lignes,
     '',
@@ -440,6 +565,7 @@ function envoyer(e) {
     '',
     encoderCommande({
       m: mode, tb: val('table'), n: val('nom'), t: val('tel'), a: val('adresse'), x: val('note'), p: paiement,
+      ...(mode === 'livraison' ? { f: frais, ...(distanceOk ? { d: +livraison.km.toFixed(1) } : {}), ...(livraison.pos ? { g: `${livraison.pos.lat},${livraison.pos.lng}` } : {}) } : {}),
       l: panier.map(l => [l.id, l.ti, l.vi, l.qte]),
     }),
   ].filter(l => l !== null).join('\n');
@@ -538,6 +664,15 @@ $$('.rail').forEach(r => r.addEventListener('scroll', majFlechesRails, { passive
 window.addEventListener('resize', majFlechesRails);
 document.addEventListener('click', e => { if (e.target.closest('[data-fermer-conf]')) $('#confirmation').close(); });
 $('#form-panier').addEventListener('submit', envoyer);
+$('#form-panier').addEventListener('click', e => {
+  const b = e.target.closest('[data-loc]');
+  if (!b) return;
+  if (b.dataset.loc === 'gps') positionGps(); else positionAdresse();
+});
+// Adresse modifiée sans position choisie : calcul automatique
+$('#form-panier').addEventListener('change', e => {
+  if (e.target.name === 'adresse' && menu.livraison && modeChoisi() === 'livraison' && !['gps', 'repere'].includes(livraison.source)) positionAdresse();
+});
 
 // Catégorie active pendant le défilement
 window.addEventListener('scroll', () => {

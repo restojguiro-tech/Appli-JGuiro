@@ -338,3 +338,12 @@ input, select, textarea {
   .diapo.seule-photo .texte { padding: 0 12px 30px; }
   .diapo.seule-photo .cta { font-size: .85rem; padding: 7px 12px; }
 }
+
+/* Livraison : position et frais selon la distance */
+.livraison-pos { display: flex; gap: 8px; flex-wrap: wrap; margin: -2px 0 10px; }
+.livraison-pos .btn { flex: 1 1 auto; font-size: .9rem; padding: 9px 12px; }
+.carte-livraison { height: 210px; border-radius: 12px; overflow: hidden; margin-bottom: 8px; border: 1px solid var(--line); }
+.carte-livraison[hidden] { display: none; }
+.info-livraison { font-size: .88rem; color: var(--muted); background: #f6f7f9; border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; }
+.info-livraison.ok { background: #e8f6ee; color: #14532d; }
+.info-livraison.erreur { background: #fdf3e1; color: #7a4a00; }

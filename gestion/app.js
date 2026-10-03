@@ -425,7 +425,8 @@ function vuePriseCommande(tableId) {
       </div>
     </div>
     ${!table && c.client && (c.client.tel || c.client.adresse) ? `<p class="muted">
-      ${c.client.tel ? `📞 ${esc(c.client.tel)}` : ''} ${c.client.adresse ? ` · 📍 ${esc(c.client.adresse)}` : ''}</p>` : ''}
+      ${c.client.tel ? `📞 ${esc(c.client.tel)}` : ''} ${c.client.adresse ? ` · 📍 ${esc(c.client.adresse)}` : ''}
+      ${c.client.position ? ` · <a href="https://maps.google.com/?q=${esc(c.client.position)}" target="_blank" rel="noopener">🗺️ Voir la position du client</a>` : ''}</p>` : ''}
     <div class="order-layout">
       <div class="card">
         <h2>Carte</h2>
@@ -2186,7 +2187,26 @@ vues.menuenligne = () => {
             <input name="cuisine" inputmode="tel" placeholder="Ex. : 212707198724" value="${esc(cfg.cuisine)}"></label>
           <label>Temps de préparation habituel (minutes, indiqué au client)
             <input name="delai" type="number" min="5" step="5" value="${esc(cfg.delai || 30)}"></label>
-          <label>Frais de livraison (DH)<input name="fraisLivraison" type="number" step="0.01" min="0" value="${esc(cfg.fraisLivraison || 0)}"></label>
+          <fieldset class="variantes">
+            <legend>🛵 Frais de livraison selon la distance</legend>
+            <label>Position du restaurant (latitude, longitude — ou collez un lien Google Maps)
+              <input name="position" placeholder="Ex. : 33.5731, -7.5898" value="${cfg.position ? esc(cfg.position.lat + ', ' + cfg.position.lng) : ''}"></label>
+            <div class="row" style="flex-wrap:wrap;margin-bottom:10px">
+              <button type="button" class="btn small" data-action="position-ici">📍 Ma position actuelle (au restaurant)</button>
+              <button type="button" class="btn small" data-action="position-adresse">🔎 Depuis l'adresse du restaurant</button>
+              ${cfg.position ? `<a class="btn small" target="_blank" rel="noopener" href="https://maps.google.com/?q=${cfg.position.lat},${cfg.position.lng}">Vérifier sur la carte</a>` : ''}
+            </div>
+            <table class="tranches">
+              <tr><th>Distance</th><th>Prix (DH)</th></tr>
+              ${(cfg.tranches?.length ? cfg.tranches : TRANCHES_LIVRAISON).map((t, i, l) => `
+                <tr><td>${i ? `de ${esc(l[i - 1].max)} ` : 'de 0 '}à <input name="tr_max_${i}" type="number" step="0.5" min="0" value="${esc(t.max)}"> km</td>
+                  <td><input name="tr_prix_${i}" type="number" step="0.5" min="0" value="${esc(t.prix)}"></td></tr>`).join('')}
+              <tr><td>au-delà (majoration possible)</td><td><input name="auDela" type="number" step="0.5" min="0" value="${esc(cfg.auDela ?? PRIX_LIVRAISON_AU_DELA)}"></td></tr>
+            </table>
+            <p class="muted small-note">Le client indique sa position (GPS ou adresse) : la distance par la route est calculée et les frais s'ajoutent au panier.
+              Sans position du restaurant, les frais fixes ci-dessous sont utilisés.</p>
+            <label>Frais fixes si la position du restaurant n'est pas indiquée (DH)<input name="fraisLivraison" type="number" step="0.01" min="0" value="${esc(cfg.fraisLivraison || 0)}"></label>
+          </fieldset>
           <p class="muted small-note">Moyens de paiement proposés aux clients :</p>
           <div class="row" style="flex-wrap:wrap">
             <label style="flex:0 0 auto"><input type="checkbox" name="pay_especes" style="width:auto" ${cfg.paiements.especes !== false ? 'checked' : ''}> 💵 Espèces (à table, au retrait, à la livraison)</label>
@@ -2420,6 +2440,23 @@ function proposerEnvois(c) {
 }
 
 Object.assign(actions, {
+  'position-ici': () => {
+    if (!navigator.geolocation) return alert('Localisation impossible sur cet appareil.');
+    navigator.geolocation.getCurrentPosition(
+      p => { $('#form-menu-en-ligne [name=position]').value = `${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`; },
+      () => alert('Localisation refusée ou impossible. Autorisez la localisation, ou collez un lien Google Maps.'),
+      { enableHighAccuracy: true, timeout: 15000 });
+  },
+  'position-adresse': async () => {
+    const adresse = db.restaurant.adresse;
+    if (!adresse) return alert("Indiquez d'abord l'adresse du restaurant dans Paramètres.");
+    try {
+      const pos = await geocoderAdresse(adresse);
+      if (!pos) return alert('Adresse introuvable sur la carte. Utilisez « Ma position actuelle » au restaurant, ou collez un lien Google Maps.');
+      $('#form-menu-en-ligne [name=position]').value = `${pos.lat}, ${pos.lng}`;
+      alert('Position trouvée. Vérifiez-la avec « Vérifier sur la carte » après avoir enregistré.');
+    } catch (e) { alert('Recherche impossible pour le moment (connexion internet ?).'); }
+  },
   'confirmer-client': () => {
     const c = commandeOuverte(tableSelectionnee);
     if (!c) return;
@@ -2481,10 +2518,14 @@ function importerCommande(data) {
     }
   }
   if (!c) c = creerCommandeExterne(mode, client);
-  if (mode === 'livraison' && Number(db.menuEnLigne.fraisLivraison) > 0) {
-    c.lignes.push({ platId: null, nom: 'Frais de livraison', prix: Number(db.menuEnLigne.fraisLivraison), supplement: 0, qte: 1 });
-  }
+  if (mode === 'livraison' && data.g) c.client = { ...c.client, position: data.g };
   lignes.filter(Boolean).forEach(l => ajouterLigneA(c, l.plat, l.taille, l.variante, l.qte));
+  // Frais calculés selon la distance sur la carte en ligne, sinon frais fixes
+  const frais = mode === 'livraison' ? (data.f != null ? Number(data.f) : Number(db.menuEnLigne.fraisLivraison) || 0) : 0;
+  if (frais > 0) {
+    const km = data.d != null ? ` (${String(data.d).replace('.', ',')} km)` : '';
+    c.lignes.push({ platId: null, nom: 'Frais de livraison' + km, prix: frais, supplement: 0, qte: 1 });
+  }
   if (data.x) c.note = [c.note, data.x].filter(Boolean).join(' — ');
   if (MENU_PAIEMENTS[data.p]) c.paiementPrevu = data.p;
   modeSalle = mode;
@@ -2583,6 +2624,10 @@ document.addEventListener('submit', e => {
     lienCourt: d.lienCourt.trim(),
     fraisLivraison: Number(d.fraisLivraison) || 0,
     cuisine: telInternational(d.cuisine),
+    position: lirePosition(d.position),
+    tranches: [0, 1, 2, 3, 4, 5].filter(i => d['tr_max_' + i] !== undefined && d['tr_max_' + i] !== '')
+      .map(i => ({ max: Number(d['tr_max_' + i]), prix: Number(d['tr_prix_' + i]) || 0 })).sort((a, b) => a.max - b.max),
+    auDela: Number(d.auDela) || PRIX_LIVRAISON_AU_DELA,
     delai: Number(d.delai) || 30,
     lienPaiement: d.lienPaiement.trim(),
     paiements: { especes: !!d.pay_especes, tpe: !!d.pay_tpe, en_ligne: !!d.pay_en_ligne },

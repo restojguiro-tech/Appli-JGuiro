@@ -53,6 +53,13 @@ Les données sont enregistrées **dans le navigateur** (localStorage) de l'appar
 
 À refaire (étape 2) après chaque modification de la carte.
 
+### Frais de livraison selon la distance
+
+Dans **Menu en ligne → Réglages**, indiquez la position du restaurant (bouton « Ma position actuelle » au restaurant, adresse, ou lien Google Maps) et la grille de prix
+(par défaut : 0–3 km 20 DH, 3–7 km 25 DH, 7–10 km 30 DH, 10–12 km 40 DH, au-delà 50 DH avec majoration possible).
+En livraison, le client donne sa position (GPS ou adresse, repère déplaçable sur une carte OpenStreetMap) : la distance par la route est calculée (OSRM)
+et les frais s'ajoutent au panier. Le message WhatsApp contient la distance, les frais et le lien de la position ; l'import reprend ces frais.
+
 ### Apparence de la carte (vitrine)
 
 La page d'accueil se présente comme un site de commande : en-tête avec Livraison / À emporter / Sur place et panier,

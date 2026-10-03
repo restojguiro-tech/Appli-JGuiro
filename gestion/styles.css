@@ -300,3 +300,7 @@ details.card summary { cursor: pointer; font-weight: 600; }
 .btn.wa .muted { color: #e3f5ea; }
 .envois-wa { margin: 10px 0 8px; flex-wrap: wrap; }
 .envois-wa .btn { flex: 1 1 auto; }
+.tranches { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+.tranches th { text-align: left; font-size: .85rem; color: var(--muted); font-weight: 600; padding: 4px; }
+.tranches td { padding: 4px; white-space: nowrap; }
+.tranches input { width: 80px; display: inline-block; margin: 0 4px; }

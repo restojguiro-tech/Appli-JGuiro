@@ -398,11 +398,31 @@ function majInfoLivraison() {
     : 'Indiquez votre position pour calculer les frais de livraison.';
 }
 
+// Position du restaurant : celle enregistrée, sinon trouvée depuis son adresse (gardée pour la visite)
+let promessePosResto = null;
+function positionRestaurant() {
+  if (menu.livraison.position) return Promise.resolve(menu.livraison.position);
+  if (!promessePosResto) {
+    promessePosResto = (async () => {
+      try { const c = JSON.parse(sessionStorage.getItem('jguiro-pos-resto') || 'null'); if (c) return c; } catch (e) { /* ignoré */ }
+      const p = await geocoderAdresse(menu.restaurant.adresse);
+      if (p) try { sessionStorage.setItem('jguiro-pos-resto', JSON.stringify(p)); } catch (e) { /* ignoré */ }
+      return p;
+    })().catch(() => null);
+  }
+  return promessePosResto.then(p => {
+    if (p) menu.livraison.position = p; else promessePosResto = null;
+    return p;
+  });
+}
+
 async function calculerLivraison(pos, source) {
   livraison = { ...livraison, pos, source, etat: 'calcul' };
   majInfoLivraison();
+  const resto = await positionRestaurant();
+  if (!resto) return erreurLivraison('Calcul impossible pour le moment : les frais de livraison vous seront confirmés par le restaurant.');
   afficherCarte();
-  const { km, route } = await distanceLivraison(menu.livraison.position, pos);
+  const { km, route } = await distanceLivraison(resto, pos);
   if (livraison.pos !== pos) return; // une autre position a été choisie entre-temps
   livraison = { ...livraison, km, route, ...tarifLivraison(km, menu.livraison), etat: 'ok' };
   majInfoLivraison();
@@ -431,8 +451,18 @@ async function positionAdresse() {
   livraison = { ...livraison, etat: 'calcul' };
   majInfoLivraison();
   try {
-    const pos = await geocoderAdresse(adresse, menu.livraison.position);
-    if (!pos) return erreurLivraison('Adresse introuvable sur la carte : précisez le quartier, ou utilisez « Ma position ».');
+    const resto = await positionRestaurant();
+    const pos = await geocoderAdresse(adresse, resto);
+    if (!pos) {
+      // Adresse introuvable : le client place lui-même le repère sur la carte (au départ sur le restaurant)
+      if (resto) {
+        livraison = { ...livraison, pos: { ...resto }, source: 'placer' };
+        await afficherCarte();
+      }
+      return erreurLivraison(resto
+        ? 'Adresse introuvable automatiquement : faites glisser le repère bleu sur votre lieu de livraison, ou utilisez « Utiliser ma position ».'
+        : 'Adresse introuvable : utilisez « Utiliser ma position ».');
+    }
     calculerLivraison(pos, 'adresse');
   } catch (e) {
     erreurLivraison('Calcul impossible pour le moment : les frais de livraison vous seront confirmés par le restaurant.');
@@ -465,7 +495,7 @@ async function afficherCarte() {
   if (!carteLeaflet) {
     carteLeaflet = L.map(zone, { attributionControl: true, zoomControl: true }).setView([lat, lng], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(carteLeaflet);
-    const r = menu.livraison.position;
+    const r = menu.livraison.position || livraison.pos;
     L.circleMarker([r.lat, r.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#d62828', fillOpacity: 1 })
       .addTo(carteLeaflet).bindTooltip(menu.restaurant.nom || 'Restaurant');
     carteLeaflet._repere = L.marker([lat, lng], { draggable: true }).addTo(carteLeaflet);
@@ -511,7 +541,7 @@ function rendrePanier() {
       <span>${dh(prixLigne(l) * l.qte)}</span>
     </div>`).join('') + (frais ? `
     <div class="ligne-panier"><span class="n">Frais de livraison${livraison.etat === 'ok' && menu.livraison ? ` (${livraison.km.toFixed(1).replace('.', ',')} km)` : ''}</span><span>${dh(frais)}</span></div>` : '')
-    + (aCalculer ? `<div class="ligne-panier"><span class="n">Frais de livraison</span><span class="petit">${livraison.etat === 'erreur' ? 'à confirmer' : 'selon la distance'}</span></div>` : '');
+    + (aCalculer ? `<div class="ligne-panier"><span class="n">Frais de livraison</span><span class="petit">${livraison.source === 'placer' ? 'placez le repère' : livraison.etat === 'erreur' ? 'à confirmer' : 'selon la distance'}</span></div>` : '');
   $('#total-panier').textContent = dh(totalPanier() + frais);
 }
 
@@ -540,6 +570,10 @@ function envoyer(e) {
     return;
   }
   if (livraison.etat === 'calcul') return;
+  if (mode === 'livraison' && livraison.source === 'placer') {
+    alert('Placez le repère sur votre lieu de livraison (ou utilisez « Utiliser ma position ») pour calculer les frais.');
+    return;
+  }
   const frais = fraisActuels();
   const distanceOk = mode === 'livraison' && menu.livraison && livraison.etat === 'ok';
   const paiement = $('input[name=paiement]:checked')?.value || paiementsMenu()[0];
@@ -688,6 +722,9 @@ chargerMenu()
     menu.bannieres = menu.bannieres || [];
     menu.photosCategories = menu.photosCategories || {};
     menu.vedettes = menu.vedettes || [];
+    // Carte publiée avant le calcul des frais : grille par défaut, position cherchée depuis l'adresse
+    if (!menu.livraison && menu.restaurant?.adresse) menu.livraison = { position: null, tranches: TRANCHES_LIVRAISON, auDela: PRIX_LIVRAISON_AU_DELA };
+    if (menu.livraison && !menu.livraison.position && !menu.restaurant?.adresse) menu.livraison = null;
     appliquerCouleur(menu.couleur);
     try { panier = JSON.parse(sessionStorage.getItem(CLE_PANIER) || '[]').filter(l => platDe(l.id)); } catch (e) { panier = []; }
     try { modeActif = sessionStorage.getItem(CLE_MODE); } catch (e) { /* ignoré */ }

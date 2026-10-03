@@ -2191,6 +2191,8 @@ vues.menuenligne = () => {
             <legend>🛵 Frais de livraison selon la distance</legend>
             <label>Position du restaurant (latitude, longitude — ou collez un lien Google Maps)
               <input name="position" placeholder="Ex. : 33.5731, -7.5898" value="${cfg.position ? esc(cfg.position.lat + ', ' + cfg.position.lng) : ''}"></label>
+            ${cfg.position ? '' : `<p class="erreur-sync" style="margin-top:-4px">⚠️ Position non enregistrée : la carte en ligne la cherche depuis l'adresse du restaurant (moins précis).
+              Le mieux : appuyez sur « Ma position actuelle » au restaurant, puis Enregistrer.</p>`}
             <div class="row" style="flex-wrap:wrap;margin-bottom:10px">
               <button type="button" class="btn small" data-action="position-ici">📍 Ma position actuelle (au restaurant)</button>
               <button type="button" class="btn small" data-action="position-adresse">🔎 Depuis l'adresse du restaurant</button>
@@ -2638,6 +2640,14 @@ document.addEventListener('submit', e => {
     alert("La carte en ligne ne sera pas proposée tant qu'aucun lien de paiement n'est indiqué.");
   }
   if (!paiementsActifs(db.menuEnLigne).length) db.menuEnLigne.paiements.especes = true;
+  // Pas de position du restaurant : on la cherche depuis son adresse (à vérifier ensuite sur la carte)
+  if (!db.menuEnLigne.position && db.restaurant.adresse) {
+    geocoderAdresse(db.restaurant.adresse).then(pos => {
+      if (!pos || db.menuEnLigne.position) return;
+      db.menuEnLigne.position = pos;
+      sauver(); rendre();
+    }).catch(() => {});
+  }
   sauver(); rendre();
   alert('Réglages enregistrés. Pensez à republier le fichier menu.json.');
 });

@@ -154,13 +154,26 @@ async function distanceLivraison(a, b) {
   return { km: distanceVolOiseau(a, b) * 1.3, route: false };
 }
 
-// Adresse → position (OpenStreetMap / Nominatim), en privilégiant les environs du restaurant
+// Adresse → position (OpenStreetMap / Nominatim). Près du restaurant si « pres » est donné.
+// Essaie l'adresse complète, puis des versions raccourcies (sans résidence, immeuble…).
 async function geocoderAdresse(adresse, pres) {
-  const p = new URLSearchParams({ format: 'jsonv2', limit: '1', countrycodes: 'ma', 'accept-language': 'fr', q: adresse });
-  if (pres) p.set('viewbox', [pres.lng - 0.3, pres.lat + 0.3, pres.lng + 0.3, pres.lat - 0.3].join(','));
-  const r = await fetch('https://nominatim.openstreetmap.org/search?' + p);
-  const x = (await r.json())[0];
-  return x ? { lat: +Number(x.lat).toFixed(6), lng: +Number(x.lon).toFixed(6) } : null;
+  const propre = String(adresse || '')
+    .replace(/\b(bd|bld|bvd|blvd)\b\.?/gi, 'boulevard').replace(/\bav\b\.?/gi, 'avenue').replace(/\s+/g, ' ').trim();
+  const parties = propre.split(/[,\n]/).map(x => x.trim()).filter(Boolean);
+  const essais = [parties.join(', ')];
+  for (let i = 1; i < parties.length; i++) essais.push(parties.slice(i).join(', '));
+  if (!pres && !/casablanca|maroc/i.test(propre)) essais.push(parties.join(', ') + ', Casablanca');
+  for (let i = 0; i < essais.length && i < 4; i++) {
+    if (i) await new Promise(r => setTimeout(r, 1100)); // règle d'usage : 1 recherche par seconde
+    const p = new URLSearchParams({ format: 'jsonv2', limit: '1', countrycodes: 'ma', 'accept-language': 'fr', q: essais[i] });
+    if (pres) {
+      p.set('viewbox', [pres.lng - 0.25, pres.lat + 0.25, pres.lng + 0.25, pres.lat - 0.25].join(','));
+      p.set('bounded', '1');
+    }
+    const x = (await (await fetch('https://nominatim.openstreetmap.org/search?' + p)).json())[0];
+    if (x) return { lat: +Number(x.lat).toFixed(6), lng: +Number(x.lon).toFixed(6) };
+  }
+  return null;
 }
 
 // Construit la carte publique (sans prix d'achat, stock, ventes…) à partir des données du restaurant.
@@ -178,7 +191,8 @@ function construireMenuPublic(d) {
     accueil: cfg.accueil || '',
     modes: Object.keys(MENU_MODES).filter(m => cfg.modes?.[m] !== false),
     fraisLivraison: Number(cfg.fraisLivraison) || 0,
-    livraison: cfg.position ? { position: cfg.position, tranches: cfg.tranches?.length ? cfg.tranches : TRANCHES_LIVRAISON, auDela: Number(cfg.auDela ?? PRIX_LIVRAISON_AU_DELA) } : null,
+    // Sans position enregistrée, la carte en ligne la cherche à partir de l'adresse du restaurant
+    livraison: { position: cfg.position || null, tranches: cfg.tranches?.length ? cfg.tranches : TRANCHES_LIVRAISON, auDela: Number(cfg.auDela ?? PRIX_LIVRAISON_AU_DELA) },
     paiements: paiementsActifs(cfg),
     lienPaiement: cfg.lienPaiement || '',
     tables: (d.tables || []).map(t => t.nom),

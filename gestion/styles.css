@@ -294,3 +294,9 @@ details.card summary { cursor: pointer; font-weight: 600; }
 .photo-cat label.btn { color: var(--text); }
 .plat-titre { display: flex; align-items: center; gap: 10px; }
 .vignette { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex: 0 0 auto; }
+
+/* Envois WhatsApp (client, cuisine) */
+.btn.wa { background: #128c4a; border-color: #128c4a; color: #fff; }
+.btn.wa .muted { color: #e3f5ea; }
+.envois-wa { margin: 10px 0 8px; flex-wrap: wrap; }
+.envois-wa .btn { flex: 1 1 auto; }

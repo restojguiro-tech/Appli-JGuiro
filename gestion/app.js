@@ -42,7 +42,7 @@ const DONNEES_DEMO = {
   achats: [],
   operations: [],
   factures: [],
-  menuEnLigne: { whatsapp: '', accueil: '', lienCourt: '', fraisLivraison: 0, lienPaiement: '', paiements: { especes: true, tpe: true, en_ligne: false }, modes: { sur_place: true, emporter: true, livraison: true } },
+  menuEnLigne: { whatsapp: '', cuisine: '212707198724', delai: 30, accueil: '', lienCourt: '', fraisLivraison: 0, lienPaiement: '', paiements: { especes: true, tpe: true, en_ligne: false }, modes: { sur_place: true, emporter: true, livraison: true } },
   stock: [
     { id: 's1', nom: 'Farine', quantite: 10, unite: 'kg', seuil: 3 },
     { id: 's2', nom: 'Beurre', quantite: 2, unite: 'kg', seuil: 2 },
@@ -61,6 +61,7 @@ function migrer(data) {
   d.menuEnLigne.paiements = { ...DONNEES_DEMO.menuEnLigne.paiements, ...d.menuEnLigne.paiements };
   // Ce raccourcisseur affiche une publicité avant la redirection : on revient au lien direct
   if (/sl1nk\.com|encurtador/i.test(d.menuEnLigne.lienCourt || '')) d.menuEnLigne.lienCourt = '';
+  if (d.menuEnLigne.cuisine === undefined) d.menuEnLigne.cuisine = DONNEES_DEMO.menuEnLigne.cuisine;
   return d;
 }
 
@@ -462,6 +463,7 @@ function vuePriseCommande(tableId) {
           </div>`).join('') : '<div class="empty">Ajoutez des articles depuis la carte.</div>'}
         <div class="ticket-total"><span>Total</span><span>${dh(c ? totalCommande(c) : 0)}</span></div>
         ${c && lignes.length ? `
+          ${boutonsWhatsApp(c)}
           <div class="row">
             <button class="btn" data-action="imprimer">🖨️ Addition</button>
             <button class="btn ok" data-action="encaisser">Encaisser</button>
@@ -2180,6 +2182,10 @@ vues.menuenligne = () => {
             ${Object.entries(MODES).map(([k, m]) => `
               <label style="flex:0 0 auto"><input type="checkbox" name="mode_${k}" style="width:auto" ${cfg.modes[k] !== false ? 'checked' : ''}> ${m.icone} ${m.libelle}</label>`).join('')}
           </div>
+          <label>Numéro WhatsApp de la cuisine (les commandes lui sont transmises en un clic)
+            <input name="cuisine" inputmode="tel" placeholder="Ex. : 212707198724" value="${esc(cfg.cuisine)}"></label>
+          <label>Temps de préparation habituel (minutes, indiqué au client)
+            <input name="delai" type="number" min="5" step="5" value="${esc(cfg.delai || 30)}"></label>
           <label>Frais de livraison (DH)<input name="fraisLivraison" type="number" step="0.01" min="0" value="${esc(cfg.fraisLivraison || 0)}"></label>
           <p class="muted small-note">Moyens de paiement proposés aux clients :</p>
           <div class="row" style="flex-wrap:wrap">
@@ -2344,6 +2350,103 @@ document.addEventListener('submit', e => {
   alert('Apparence enregistrée.');
 });
 
+/* ---------- Réponse au client et envoi en cuisine (WhatsApp) ---------- */
+
+// Numéro au format international sans « + » (06… → 2126…)
+function telInternational(tel) {
+  let n = String(tel || '').replace(/\D/g, '').replace(/^00/, '');
+  if (/^0[5-7]\d{8}$/.test(n)) n = '212' + n.slice(1);
+  else if (/^[5-7]\d{8}$/.test(n)) n = '212' + n;
+  return n;
+}
+
+const lignesTexte = c => c.lignes.filter(l => l.platId).map(l => `• ${l.qte} × ${l.nom}`);
+
+function messageClient(c, delai) {
+  const mode = modeDe(c);
+  const prenom = (c.client?.nom || '').split(' ')[0];
+  const quand = mode === 'livraison' ? `livrée dans environ ${delai} min` : mode === 'emporter' ? `prête dans environ ${delai} min` : `servie dans environ ${delai} min`;
+  return [
+    `Bonjour${prenom ? ' ' + prenom : ''} 👋`,
+    `Merci pour votre commande chez *${db.restaurant.nom}* ! ✅ Elle est bien reçue et part en cuisine.`,
+    '',
+    ...c.lignes.map(l => `• ${l.qte} × ${l.nom} = ${dh(l.prix * l.qte)}`),
+    `*Total : ${dh(totalCommande(c))}*`,
+    '',
+    `${MODES[mode].icone} ${MODES[mode].libelle}${mode === 'livraison' && c.client?.adresse ? ` — ${c.client.adresse}` : ''}`,
+    c.paiementPrevu ? `Paiement : ${MENU_PAIEMENTS[c.paiementPrevu]}` : null,
+    `⏱️ Votre commande sera ${quand}.`,
+    '',
+    'À tout de suite !',
+  ].filter(l => l !== null).join('\n');
+}
+
+function messageCuisine(c) {
+  const mode = modeDe(c);
+  return [
+    `👨‍🍳 *COMMANDE — ${MODES[mode].libelle.toUpperCase()}*`,
+    `${c.tableNom} · reçue à ${fmtHeure(c.ouverteLe)}`,
+    '',
+    ...lignesTexte(c),
+    c.note ? `\n📝 ${c.note}` : null,
+  ].filter(l => l !== null).join('\n');
+}
+
+function ouvrirWhatsApp(numero, texte) {
+  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texte)}`, '_blank', 'noopener');
+}
+
+function boutonsWhatsApp(c) {
+  const tel = telInternational(c.client?.tel);
+  return `
+    <div class="row envois-wa">
+      ${tel ? `<button class="btn ${c.confirmeeLe ? '' : 'wa'}" data-action="confirmer-client">${c.confirmeeLe ? '✓ Client prévenu' : '✅ Confirmer au client'}</button>` : ''}
+      <button class="btn ${c.cuisineLe ? '' : 'wa'}" data-action="envoyer-cuisine">${c.cuisineLe ? '✓ Envoyée en cuisine' : '👨‍🍳 Envoyer en cuisine'}</button>
+    </div>`;
+}
+
+// Juste après l'import d'une commande WhatsApp : les deux envois en deux clics
+function proposerEnvois(c) {
+  const tel = telInternational(c.client?.tel);
+  ouvrirModal('Commande importée ✅', `
+    <p>${esc(c.tableNom)} — ${c.lignes.length} ligne(s), <strong>${dh(totalCommande(c))}</strong></p>
+    <label>Délai annoncé au client (minutes)<input id="delai-prep" type="number" min="5" step="5" value="${esc(db.menuEnLigne.delai || 30)}"></label>
+    <div class="choix-variantes" style="grid-template-columns:1fr">
+      ${tel ? `<button type="button" class="btn wa" data-action="confirmer-client">1. ✅ Confirmer la commande au client<span class="muted">WhatsApp s'ouvre avec le message prêt : appuyez sur Envoyer.</span></button>`
+        : '<p class="muted">Pas de numéro client : la confirmation se fait sur place.</p>'}
+      ${db.menuEnLigne.cuisine ? `<button type="button" class="btn wa" data-action="envoyer-cuisine">${tel ? '2' : '1'}. 👨‍🍳 Envoyer la commande à la cuisine<span class="muted">Au ${esc('+' + db.menuEnLigne.cuisine)}</span></button>`
+        : '<p class="muted">Indiquez le numéro de la cuisine dans Menu en ligne → Réglages.</p>'}
+    </div>`, null, 'Fermer');
+}
+
+Object.assign(actions, {
+  'confirmer-client': () => {
+    const c = commandeOuverte(tableSelectionnee);
+    if (!c) return;
+    const delai = Number($('#delai-prep')?.value) || db.menuEnLigne.delai || 30;
+    ouvrirWhatsApp(telInternational(c.client?.tel), messageClient(c, delai));
+    c.confirmeeLe = new Date().toISOString();
+    sauver();
+    marquerEnvoi('confirmer-client', '✓ Client prévenu');
+  },
+  'envoyer-cuisine': () => {
+    const c = commandeOuverte(tableSelectionnee);
+    if (!c) return;
+    if (!db.menuEnLigne.cuisine) return alert('Indiquez le numéro WhatsApp de la cuisine dans Menu en ligne → Réglages.');
+    ouvrirWhatsApp(db.menuEnLigne.cuisine, messageCuisine(c));
+    c.cuisineLe = new Date().toISOString();
+    sauver();
+    marquerEnvoi('envoyer-cuisine', '✓ Envoyée en cuisine');
+  },
+});
+
+// Met à jour le bouton sans redessiner la fenêtre ouverte
+function marquerEnvoi(action, texte) {
+  if (modal.open) {
+    $$(`#modal [data-action="${action}"]`).forEach(b => { b.classList.remove('wa'); b.firstChild.textContent = texte + ' '; });
+  } else rendre();
+}
+
 function creerCommandeExterne(type, client) {
   const jour = aujourdHui();
   const numero = db.commandes.filter(c => modeDe(c) !== 'sur_place' && jourDe(c.ouverteLe) === jour).length + 1;
@@ -2464,6 +2567,8 @@ Object.assign(actions, {
       const manquants = importerCommande(data);
       if (manquants) alert(`${manquants} article(s) ne sont plus sur la carte et n'ont pas été ajoutés.`);
       if (location.hash !== '#commandes') { garderSelection = true; location.hash = '#commandes'; }
+      const c = commandeOuverte(tableSelectionnee);
+      if (c?.lignes.length) setTimeout(() => proposerEnvois(c), 0);
     }, 'Importer'),
 });
 
@@ -2477,6 +2582,8 @@ document.addEventListener('submit', e => {
     accueil: d.accueil.trim(),
     lienCourt: d.lienCourt.trim(),
     fraisLivraison: Number(d.fraisLivraison) || 0,
+    cuisine: telInternational(d.cuisine),
+    delai: Number(d.delai) || 30,
     lienPaiement: d.lienPaiement.trim(),
     paiements: { especes: !!d.pay_especes, tpe: !!d.pay_tpe, en_ligne: !!d.pay_en_ligne },
     modes: Object.fromEntries(Object.keys(MODES).map(k => [k, !!d['mode_' + k]])),

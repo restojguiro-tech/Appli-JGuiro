@@ -49,6 +49,7 @@ Les données sont enregistrées **dans le navigateur** (localStorage) de l'appar
 2. Cliquez sur **Télécharger le fichier menu.json**, puis sur **Ouvrir GitHub** et déposez ce fichier dans le dépôt (bouton *Commit changes*).
 3. La carte est alors visible sur la page d'accueil du site (l'application de gestion est dans `gestion/`). Partagez le lien ou imprimez le QR code.
 4. Quand un client envoie sa commande par WhatsApp, copiez son message et collez-le dans **Importer une commande WhatsApp** : la commande est créée automatiquement.
+5. Juste après l'import, deux boutons : **✅ Confirmer au client** (message de validation avec le détail, le total et le délai) et **👨‍🍳 Envoyer en cuisine** (au numéro de la cuisine réglé dans Menu en ligne → Réglages). WhatsApp s'ouvre avec le message prêt, il suffit d'appuyer sur Envoyer. Les mêmes boutons sont sur le ticket de la commande.
 
 À refaire (étape 2) après chaque modification de la carte.
 
